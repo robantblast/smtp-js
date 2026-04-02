@@ -5,11 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postinstall": "playwright install chromium",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
+    "@sparticuz/chromium": "^143.0.4",
     "@sendgrid/mail": "^8.1.6",
     "next": "14.0.4",
     "nodemailer": "^6.9.7",
