@@ -1,7 +1,6 @@
 import nodemailer from "nodemailer";
 import sgMail from "@sendgrid/mail";
 import { promises as fs } from "fs";
-import path from "path";
 import type { BankAccount, BankAccountsFile, CampaignRequest, Lead, SmtpCredentials } from "@/lib/types";
 import { applySubjectTemplate, applyTemplate, buildCatchAllReplyTo, splitNameAndFormatEmail } from "./placeholders";
 import {
@@ -11,6 +10,7 @@ import {
 } from "./date-replacements";
 import { recordCampaignEvent } from "./progress";
 import { generateInvoiceCode, generateRandomNumber, randomString } from "./random";
+import { buildLogFilename, getLogFilePath } from "./logs";
 import { generatePdfFromHtml } from "./pdf";
 
 const DEFAULT_CHUNK_SIZE = 50;
@@ -21,16 +21,13 @@ function looksLikeHtml(value: string): boolean {
   );
 }
 
-function getLogFilePath() {
-  const now = new Date();
-  const day = String(now.getDate()).padStart(2, "0");
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const year = now.getFullYear();
-  return path.join(process.cwd(), `logs-SENT-${day}-${month}-${year}.txt`);
-}
-
-async function logSentEmail(email: string) {
-  const filePath = getLogFilePath();
+async function logSentEmail(
+  email: string,
+  logFilename?: string,
+  leadsFilename?: string
+) {
+  const filename = logFilename || buildLogFilename(leadsFilename);
+  const filePath = getLogFilePath(filename);
   await fs.appendFile(filePath, `${email}\r\n`);
 }
 
@@ -246,7 +243,7 @@ export async function sendCampaign(payload: CampaignPayload) {
           }
 
           results.push({ email: lead.email, status: "success" });
-          await logSentEmail(lead.email);
+          await logSentEmail(lead.email, request.logFilename, request.leadsFilename);
           if (shouldStream && request.campaignId) {
             recordCampaignEvent(request.campaignId, {
               email: lead.email,

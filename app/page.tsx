@@ -45,8 +45,10 @@ export default function Home() {
             setLiveCampaignId(null);
           }
         } else if (response.status === 404) {
-          setIsPolling(false);
-          setLiveCampaignId(null);
+          if (!isSending) {
+            setIsPolling(false);
+            setLiveCampaignId(null);
+          }
         }
       } catch {
         // Ignore polling errors and keep trying.
@@ -61,7 +63,7 @@ export default function Home() {
       active = false;
       clearInterval(interval);
     };
-  }, [liveCampaignId, streamingEnabled]);
+  }, [liveCampaignId, streamingEnabled, isSending]);
 
   const handleTest = async (nextCredentials: SmtpCredentials) => {
     setIsTesting(true);
@@ -192,9 +194,14 @@ export default function Home() {
                         className="flex flex-col gap-1 rounded-xl border border-ink-700/60 bg-ink-900/40 px-3 py-2"
                       >
                         <span className="font-semibold">
+                          {event.status === "success" ? "Sent" : "Failed"}
+                        </span>
+                        {/*
+                        <span className="font-semibold">
                           {event.status === "success" ? "Sent" : "Failed"}: {event.email}
                         </span>
                         <span className="text-[11px] text-ink-400">{event.timestamp}</span>
+                        */}
                         {event.error && (
                           <span className="text-[11px] text-rose-200">{event.error}</span>
                         )}

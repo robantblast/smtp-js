@@ -4,6 +4,7 @@ import path from "path";
 import type { CampaignRequest, SendCampaignResponse } from "@/lib/types";
 import { parseBankAccounts, parseLeads } from "@/lib/campaign/parsers";
 import { sendCampaign } from "@/lib/campaign/sender";
+import { buildLogFilename } from "@/lib/campaign/logs";
 import { finishCampaign, startCampaign } from "@/lib/campaign/progress";
 
 export const runtime = "nodejs";
@@ -58,9 +59,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
       ? invoicePrefixRaw
       : `$${invoicePrefixRaw}`;
 
-    const leads = parseLeads(await leadsFile.text(), leadsFile.name || "leads.json");
+    const leadsFilename = leadsFile.name || "leads.json";
+    const leads = parseLeads(await leadsFile.text(), leadsFilename);
     const bankAccounts = parseBankAccounts(await bankFile.text());
     const letterTemplate = await letterFile.text();
+    const logFilename = buildLogFilename(leadsFilename);
 
     let invoiceTemplate = "";
     if (invoiceFile) {
@@ -85,6 +88,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
       baseDateTime: String(formData.get("baseDateTime") || "") || undefined,
       campaignId,
       enableStreaming,
+      leadsFilename,
+      logFilename,
       emailsPerAccount: formData.get("emailsPerAccount")
         ? Number(formData.get("emailsPerAccount"))
         : undefined,
@@ -119,6 +124,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
           ? `Sent ${summary.sent} emails successfully`
           : `Sent ${summary.sent} emails, ${summary.failed} failed`,
       campaignId,
+      logFilename,
+      logDownloadUrl: `/api/campaign-log?filename=${encodeURIComponent(logFilename)}`,
       summary: {
         sent: summary.sent,
         failed: summary.failed

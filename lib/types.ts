@@ -54,6 +54,8 @@ export interface SendCampaignResponse {
   message: string;
   error?: string;
   campaignId?: string;
+  logFilename?: string;
+  logDownloadUrl?: string;
   summary?: {
     sent: number;
     failed: number;
@@ -113,6 +115,8 @@ export interface CampaignRequest {
   baseDateTime?: string;
   campaignId?: string;
   enableStreaming?: boolean;
+  leadsFilename?: string;
+  logFilename?: string;
   emailsPerAccount?: number;
   chunkSize: number;
   interChunkDelayMs: number;

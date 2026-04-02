@@ -234,7 +234,7 @@ export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
               {selectedConfig.host}:{selectedConfig.port} ({selectedConfig.secure ? "SSL" : "STARTTLS"})
             </span>
           )}
-          {useApiMode && <span>SendGrid API mode enabled</span>}
+          {useApiMode && <span>SG API mode enabled</span>}
         </div>
         <button
           type="submit"

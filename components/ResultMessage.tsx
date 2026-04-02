@@ -29,6 +29,14 @@ export default function ResultMessage({ title, result, onDismiss }: ResultMessag
               <p>Failed: {result.summary.failed}</p>
             </div>
           )}
+          {"logDownloadUrl" in result && result.logDownloadUrl && (
+            <a
+              href={result.logDownloadUrl}
+              className="mt-3 inline-flex w-fit items-center rounded-full border border-ink-600 bg-ink-800/70 px-3 py-1 text-xs text-ink-200 hover:bg-ink-800"
+            >
+              Download sent log
+            </a>
+          )}
         </div>
         {onDismiss && (
           <button
