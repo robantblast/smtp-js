@@ -1,0 +1,32 @@
+# dependencies
+/node_modules
+
+# Next.js build output
+/.next
+/out
+
+# production
+/dist
+
+# local env files
+.env
+.env.*
+
+# logs
+logs-SENT-*.txt
+*.log
+
+# local data files
+index20262.js
+invoice.html
+LETTER.txt
+leads*.js
+leads*.json
+bankAccounts.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode

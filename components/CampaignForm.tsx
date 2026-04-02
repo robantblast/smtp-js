@@ -1,0 +1,291 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import type { SmtpCredentials } from "@/lib/types";
+
+interface CampaignFormProps {
+  credentials: SmtpCredentials | null;
+  isLoading: boolean;
+  enableStreaming: boolean;
+  onToggleStreaming: (value: boolean) => void;
+  onSend: (
+    payload: FormData,
+    options: { campaignId?: string; enableStreaming: boolean }
+  ) => void;
+}
+
+export default function CampaignForm({
+  credentials,
+  isLoading,
+  enableStreaming,
+  onToggleStreaming,
+  onSend
+}: CampaignFormProps) {
+  const [leadsFile, setLeadsFile] = useState<File | null>(null);
+  const [bankFile, setBankFile] = useState<File | null>(null);
+  const [letterFile, setLetterFile] = useState<File | null>(null);
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
+  const [emailsPerAccount, setEmailsPerAccount] = useState("");
+  const [chunkSize, setChunkSize] = useState("50");
+  const [delaySeconds, setDelaySeconds] = useState("10");
+  const [senderEmail, setSenderEmail] = useState("");
+  const [invoicePrefix, setInvoicePrefix] = useState("$");
+  const [baseDateTime, setBaseDateTime] = useState("");
+
+  const createCampaignId = () => {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return crypto.randomUUID();
+    }
+    return `campaign-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  };
+
+  const normalizeInvoicePrefix = (value: string) => {
+    const trimmed = value.trimStart();
+    if (!trimmed) return "$";
+    if (trimmed.startsWith("$")) return trimmed;
+    return `$${trimmed}`;
+  };
+
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault();
+
+    if (!credentials) return;
+    if (!leadsFile || !bankFile || !letterFile) return;
+
+    const payload = new FormData();
+    payload.append("leads", leadsFile);
+    payload.append("bankAccounts", bankFile);
+    payload.append("letter", letterFile);
+
+    if (invoiceFile) {
+      payload.append("invoiceHtml", invoiceFile);
+    }
+
+    payload.append("senderEmail", senderEmail);
+
+    const normalizedInvoicePrefix = normalizeInvoicePrefix(invoicePrefix);
+    if (!normalizedInvoicePrefix || normalizedInvoicePrefix.trim() === "$") return;
+    payload.append("invoicePrefix", normalizedInvoicePrefix);
+
+    if (baseDateTime) {
+      payload.append("baseDateTime", baseDateTime);
+    }
+
+    if (emailsPerAccount) payload.append("emailsPerAccount", emailsPerAccount);
+    if (chunkSize) payload.append("chunkSize", chunkSize);
+    if (delaySeconds) {
+      const delayValue = Number(delaySeconds);
+      const msValue = Number.isFinite(delayValue) ? Math.max(0, delayValue) * 1000 : 0;
+      payload.append("interChunkDelayMs", String(msValue));
+    }
+
+    const campaignId = enableStreaming ? createCampaignId() : undefined;
+    if (enableStreaming) {
+      payload.append("enableStreaming", "1");
+      if (campaignId) {
+        payload.append("campaignId", campaignId);
+      }
+    } else {
+      payload.append("enableStreaming", "0");
+    }
+
+    onSend(payload, { campaignId, enableStreaming });
+  };
+
+  const isInvoicePrefixValid = invoicePrefix.trim().length > 1 && invoicePrefix.trim() !== "$";
+  const isReady = credentials && leadsFile && bankFile && letterFile && isInvoicePrefixValid;
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-[28px] border border-ink-700/60 bg-ink-900/70 p-8 shadow-soft backdrop-blur"
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-xs uppercase tracking-[0.2em] text-ink-300">Step 2</p>
+        <h2 className="font-display text-3xl text-ink-50">Send the campaign</h2>
+        <p className="text-sm text-ink-200">
+          Provide the data files and templates used to generate each message.
+        </p>
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="text-ink-200">Leads JSON/JS (required)</span>
+          <input
+            type="file"
+            accept="application/json,text/javascript,application/javascript,.json,.js"
+            onChange={(event) => setLeadsFile(event.target.files?.[0] || null)}
+            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100"
+            required
+          />
+          <span className="text-xs text-ink-300">
+            JS files must export an array via module.exports or export default.
+          </span>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="text-ink-200">Bank accounts JSON (required)</span>
+          <input
+            type="file"
+            accept="application/json"
+            onChange={(event) => setBankFile(event.target.files?.[0] || null)}
+            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100"
+            required
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="text-ink-200">Letter template (required)</span>
+          <input
+            type="file"
+            accept="text/plain,text/html"
+            onChange={(event) => setLetterFile(event.target.files?.[0] || null)}
+            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100"
+            required
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="text-ink-200">Invoice HTML (optional)</span>
+          <input
+            type="file"
+            accept="text/html"
+            onChange={(event) => setInvoiceFile(event.target.files?.[0] || null)}
+            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100"
+          />
+          <span className="text-xs text-ink-300">
+            If empty, the server will use invoice.html at the project root.
+          </span>
+        </label>
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="text-ink-200">
+            Sender email override
+            <span
+              className="ml-2 cursor-help text-ink-400"
+              title="Overrides the From email for this campaign only. Leave blank to use SMTP/SendGrid From."
+            >
+              (?)
+            </span>
+          </span>
+          <input
+            type="email"
+            value={senderEmail}
+            onChange={(event) => setSenderEmail(event.target.value)}
+            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
+            placeholder="billing@domain.com"
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="text-ink-200">Emails per account</span>
+          <input
+            type="number"
+            value={emailsPerAccount}
+            onChange={(event) => setEmailsPerAccount(event.target.value)}
+            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
+            placeholder="Use JSON value"
+            min={1}
+          />
+          <span className="text-xs text-ink-300">
+            How many emails to send before rotating to the next bank account.
+          </span>
+        </label>
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="text-ink-200">Invoice prefix (required)</span>
+          <input
+            type="text"
+            value={invoicePrefix}
+            onChange={(event) => setInvoicePrefix(normalizeInvoicePrefix(event.target.value))}
+            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
+            placeholder="$39"
+            required
+            minLength={2}
+          />
+          <span className="text-xs text-ink-300">
+            Used to generate invoice amounts. Starts with $ automatically.
+          </span>
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="text-ink-200">Base date/time (US Eastern)</span>
+          <input
+            type="datetime-local"
+            value={baseDateTime}
+            onChange={(event) => setBaseDateTime(event.target.value)}
+            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
+          />
+          <span className="text-xs text-ink-300">
+            Enter the date/time in America/New_York. Used to fill thread dates.
+          </span>
+        </label>
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <label className="flex items-center gap-3 text-sm text-ink-200">
+          <input
+            type="checkbox"
+            checked={enableStreaming}
+            onChange={(event) => onToggleStreaming(event.target.checked)}
+            className="h-4 w-4"
+          />
+          Live updates while sending
+        </label>
+        <span className="text-xs text-ink-300">
+          Shows emails as they are sent. Turn off to reduce server polling.
+        </span>
+      </div>
+
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="text-ink-200">Chunk size</span>
+          <input
+            type="number"
+            value={chunkSize}
+            onChange={(event) => setChunkSize(event.target.value)}
+            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
+            min={1}
+          />
+          <span className="text-xs text-ink-300">
+            How many emails are sent in parallel before the next pause.
+          </span>
+        </label>
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="text-ink-200">Delay between chunks (seconds)</span>
+          <input
+            type="number"
+            value={delaySeconds}
+            onChange={(event) => setDelaySeconds(event.target.value)}
+            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
+            min={0}
+          />
+          <span className="text-xs text-ink-300">
+            Wait time in seconds between each chunk to avoid throttling.
+          </span>
+        </label>
+      </div>
+
+      {!credentials && (
+        <div className="mt-4 rounded-2xl border border-clay-700/60 bg-clay-900/30 px-4 py-3 text-sm text-clay-200">
+          Connect SMTP first to enable sending.
+        </div>
+      )}
+
+      <div className="mt-6 flex justify-end">
+        <button
+          type="submit"
+          disabled={!isReady || isLoading}
+          className="rounded-full bg-clay-500 px-6 py-2 text-sm font-semibold text-ink-900 shadow-chip transition hover:bg-clay-400 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isLoading ? "Sending..." : "Send Campaign"}
+        </button>
+      </div>
+    </form>
+  );
+}

@@ -1,0 +1,96 @@
+import { NextRequest, NextResponse } from "next/server";
+import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
+import type { TestSmtpResponse } from "@/lib/types";
+
+export async function POST(request: NextRequest): Promise<NextResponse<TestSmtpResponse>> {
+  try {
+    const formData = await request.formData();
+    const credentialsRaw = formData.get("credentials") as string | null;
+
+    if (!credentialsRaw) {
+      return NextResponse.json(
+        { success: false, message: "Missing credentials", error: "credentials is required" },
+        { status: 400 }
+      );
+    }
+
+    const credentials = JSON.parse(credentialsRaw);
+
+    const mode = credentials.mode || "smtp";
+
+    let successMessage = "SMTP verified successfully";
+
+    if (mode === "sendgrid") {
+      if (!credentials.apiKey) {
+        return NextResponse.json(
+          { success: false, message: "Missing SendGrid API key", error: "apiKey is required" },
+          { status: 400 }
+        );
+      }
+
+      if (!credentials.fromEmail) {
+        return NextResponse.json(
+          { success: false, message: "Missing sender email", error: "fromEmail is required" },
+          { status: 400 }
+        );
+      }
+
+      sgMail.setApiKey(credentials.apiKey);
+      await sgMail.client.request({ method: "GET", url: "/v3/user/profile" });
+
+      const testRecipient = credentials.testRecipient || credentials.fromEmail;
+      await sgMail.send({
+        to: testRecipient,
+        from: credentials.fromEmail,
+        subject: "SendGrid test",
+        text: "This is a SendGrid API test from the SMTP tester.",
+        html: "<p>This is a SendGrid API test from the SMTP tester.</p>"
+      } as any);
+      successMessage = `SendGrid test email sent to ${testRecipient}`;
+    } else {
+      if (!credentials.fromEmail) {
+        return NextResponse.json(
+          { success: false, message: "Missing sender email", error: "fromEmail is required" },
+          { status: 400 }
+        );
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: credentials.host,
+        port: credentials.port,
+        secure: credentials.secure,
+        auth: {
+          user: credentials.username,
+          pass: credentials.password
+        },
+        tls: {
+          rejectUnauthorized: false
+        }
+      });
+
+      await transporter.verify();
+
+      const testRecipient = credentials.testRecipient || credentials.fromEmail;
+      await transporter.sendMail({
+        from: credentials.fromEmail,
+        to: testRecipient,
+        subject: "SMTP test",
+        text: "This is a test email from the SMTP tester."
+      });
+      successMessage = `SMTP test email sent to ${testRecipient}`;
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: successMessage
+    });
+  } catch (error) {
+    console.error("test-smtp failed", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json(
+      { success: false, message: "SMTP verification failed", error: message },
+      { status: 500 }
+    );
+  }
+}
