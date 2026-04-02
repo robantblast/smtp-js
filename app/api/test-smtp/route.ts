@@ -37,7 +37,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<TestSmtpR
       }
 
       sgMail.setApiKey(credentials.apiKey);
-      await sgMail.client.request({ method: "GET", url: "/v3/user/profile" });
 
       const testRecipient = credentials.testRecipient || credentials.fromEmail;
       await sgMail.send({

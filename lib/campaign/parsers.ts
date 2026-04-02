@@ -66,12 +66,13 @@ export function parseLeads(content: string, filename = "leads.json"): Lead[] {
       }
 
       if (typeof item === "object" && item) {
+        const leadItem = item as Record<string, unknown>;
         return {
-          email: String(item.email || "").trim(),
-          name: String(item.name || item.email || "").trim(),
-          title: item.title || item.job_title,
-          company: item.company_name || item.company,
-          address: item.address
+          email: String(leadItem.email ?? "").trim(),
+          name: String(leadItem.name ?? leadItem.email ?? "").trim(),
+          title: leadItem.title ?? leadItem.job_title,
+          company: leadItem.company_name ?? leadItem.company,
+          address: leadItem.address
         };
       }
 
