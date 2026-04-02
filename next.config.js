@@ -1,8 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  outputFileTracingIncludes: {
-    "/api/send-campaign": ["./node_modules/@sparticuz/chromium/bin/**"]
+  output: 'standalone',
+
+  experimental: {
+    serverComponentsExternalPackages: ['@sparticuz/chromium']
   }
 };
 
