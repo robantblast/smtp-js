@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import sgMail from "@sendgrid/mail";
+import { SESClient, SendRawEmailCommand } from "@aws-sdk/client-ses";
 import { promises as fs } from "fs";
 import type { BankAccount, BankAccountsFile, CampaignRequest, Lead, SmtpCredentials } from "@/lib/types";
 import { applySubjectTemplate, applyTemplate, buildCatchAllReplyTo, splitNameAndFormatEmail } from "./placeholders";
@@ -88,6 +89,26 @@ export async function sendCampaign(payload: CampaignPayload) {
       throw new Error("SendGrid API key is required");
     }
     sgMail.setApiKey(credentials.apiKey);
+  } else if (mode === "ses") {
+    if (!credentials.sesRegion || !credentials.sesAccessKeyId || !credentials.sesSecretAccessKey) {
+      throw new Error("SES region and access keys are required");
+    }
+
+    const sesClient = new SESClient({
+      region: credentials.sesRegion,
+      credentials: {
+        accessKeyId: credentials.sesAccessKeyId,
+        secretAccessKey: credentials.sesSecretAccessKey,
+        sessionToken: credentials.sesSessionToken || undefined
+      }
+    });
+
+    transporter = nodemailer.createTransport({
+      SES: {
+        ses: sesClient,
+        aws: { SendRawEmailCommand }
+      }
+    });
   } else {
     transporter = nodemailer.createTransport({
       host: credentials.host,

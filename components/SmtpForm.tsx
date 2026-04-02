@@ -22,6 +22,10 @@ export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
   const [customHost, setCustomHost] = useState("");
   const [customPort, setCustomPort] = useState("587");
   const [customSecure, setCustomSecure] = useState(false);
+  const [sesRegion, setSesRegion] = useState("");
+  const [sesAccessKeyId, setSesAccessKeyId] = useState("");
+  const [sesSecretAccessKey, setSesSecretAccessKey] = useState("");
+  const [sesSessionToken, setSesSessionToken] = useState("");
 
   const selectedConfig = useMemo(
     () => SMTP_CONFIGS.find((item) => item.name === provider),
@@ -29,20 +33,26 @@ export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
   );
 
   const isSendgrid = provider === "SendGrid";
+  const isSes = provider === "Amazon SES";
   const showCustom = provider === "Custom";
   const useApiMode = isSendgrid && useSendgridApi;
+  const useSmtp = !useApiMode && !isSes;
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
 
     const credentials: SmtpCredentials = {
-      mode: useApiMode ? "sendgrid" : "smtp",
+      mode: isSes ? "ses" : useApiMode ? "sendgrid" : "smtp",
       apiKey: useApiMode ? apiKey : undefined,
-      username: useApiMode ? undefined : username,
-      password: useApiMode ? undefined : password,
-      host: useApiMode ? undefined : showCustom ? customHost : selectedConfig?.host || "",
-      port: useApiMode ? undefined : showCustom ? Number(customPort) : selectedConfig?.port || 587,
-      secure: useApiMode ? undefined : showCustom ? customSecure : selectedConfig?.secure || false,
+      username: useSmtp ? username : undefined,
+      password: useSmtp ? password : undefined,
+      host: useSmtp ? (showCustom ? customHost : selectedConfig?.host || "") : undefined,
+      port: useSmtp ? (showCustom ? Number(customPort) : selectedConfig?.port || 587) : undefined,
+      secure: useSmtp ? (showCustom ? customSecure : selectedConfig?.secure || false) : undefined,
+      sesRegion: isSes ? sesRegion.trim() || undefined : undefined,
+      sesAccessKeyId: isSes ? sesAccessKeyId.trim() || undefined : undefined,
+      sesSecretAccessKey: isSes ? sesSecretAccessKey.trim() || undefined : undefined,
+      sesSessionToken: isSes ? sesSessionToken.trim() || undefined : undefined,
       senderName: senderName.trim() || undefined,
       fromEmail: fromEmail.trim() || undefined,
       replyTo: replyTo.trim() || undefined,
@@ -53,6 +63,9 @@ export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
   };
 
   const isValid = () => {
+    if (isSes) {
+      return Boolean(sesRegion && sesAccessKeyId && sesSecretAccessKey && fromEmail);
+    }
     if (useApiMode) {
       return Boolean(apiKey && fromEmail);
     }
@@ -102,7 +115,56 @@ export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
           </label>
         )}
 
-        {useApiMode ? (
+        {isSes ? (
+          <>
+            <label className="flex flex-col gap-2 text-sm">
+              <span className="text-ink-200">SES Region</span>
+              <input
+                type="text"
+                value={sesRegion}
+                onChange={(event) => setSesRegion(event.target.value)}
+                className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
+                placeholder="us-east-1"
+                required
+              />
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm">
+              <span className="text-ink-200">SES Access Key ID</span>
+              <input
+                type="text"
+                value={sesAccessKeyId}
+                onChange={(event) => setSesAccessKeyId(event.target.value)}
+                className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
+                placeholder="AKIA..."
+                required
+              />
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm md:col-span-2">
+              <span className="text-ink-200">SES Secret Access Key</span>
+              <input
+                type="password"
+                value={sesSecretAccessKey}
+                onChange={(event) => setSesSecretAccessKey(event.target.value)}
+                className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
+                placeholder="Your secret key"
+                required
+              />
+            </label>
+
+            <label className="flex flex-col gap-2 text-sm md:col-span-2">
+              <span className="text-ink-200">Session Token (optional)</span>
+              <input
+                type="password"
+                value={sesSessionToken}
+                onChange={(event) => setSesSessionToken(event.target.value)}
+                className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
+                placeholder="Required for temporary credentials"
+              />
+            </label>
+          </>
+        ) : useApiMode ? (
           <label className="flex flex-col gap-2 text-sm md:col-span-2">
             <span className="text-ink-200">SG API Key</span>
             <input
@@ -191,7 +253,7 @@ export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
         </label>
       </div>
 
-      {showCustom && !useApiMode && (
+      {showCustom && useSmtp && (
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           <label className="flex flex-col gap-2 text-sm">
             <span className="text-ink-200">Host</span>
@@ -229,12 +291,13 @@ export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
 
       <div className="mt-6 flex items-center justify-between">
         <div className="text-xs text-ink-300">
-          {selectedConfig && !showCustom && !useApiMode && (
+          {selectedConfig && !showCustom && !useApiMode && !isSes && (
             <span>
               {selectedConfig.host}:{selectedConfig.port} ({selectedConfig.secure ? "SSL" : "STARTTLS"})
             </span>
           )}
           {useApiMode && <span>SG API mode enabled</span>}
+          {isSes && <span>SES API mode enabled</span>}
         </div>
         <button
           type="submit"

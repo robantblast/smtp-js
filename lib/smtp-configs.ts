@@ -15,6 +15,13 @@ export const SMTP_CONFIGS: SmtpConfig[] = [
     secure: false
   },
   {
+    name: "Amazon SES",
+    displayName: "AWS SES",
+    host: "",
+    port: 587,
+    secure: false
+  },
+  {
     name: "Postmark",
     host: "smtp.postmarkapp.com",
     port: 587,

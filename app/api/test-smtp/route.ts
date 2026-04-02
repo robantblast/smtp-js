@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import sgMail from "@sendgrid/mail";
+import { SESClient, SendRawEmailCommand } from "@aws-sdk/client-ses";
 import type { TestSmtpResponse } from "@/lib/types";
 
 export async function POST(request: NextRequest): Promise<NextResponse<TestSmtpResponse>> {
@@ -47,6 +48,49 @@ export async function POST(request: NextRequest): Promise<NextResponse<TestSmtpR
         html: "<p>This is a SendGrid API test from the SMTP tester.</p>"
       } as any);
       successMessage = `SendGrid test email sent to ${testRecipient}`;
+    } else if (mode === "ses") {
+      if (!credentials.fromEmail) {
+        return NextResponse.json(
+          { success: false, message: "Missing sender email", error: "fromEmail is required" },
+          { status: 400 }
+        );
+      }
+
+      if (!credentials.sesRegion || !credentials.sesAccessKeyId || !credentials.sesSecretAccessKey) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Missing SES credentials",
+            error: "sesRegion, sesAccessKeyId, and sesSecretAccessKey are required"
+          },
+          { status: 400 }
+        );
+      }
+
+      const sesClient = new SESClient({
+        region: credentials.sesRegion,
+        credentials: {
+          accessKeyId: credentials.sesAccessKeyId,
+          secretAccessKey: credentials.sesSecretAccessKey,
+          sessionToken: credentials.sesSessionToken || undefined
+        }
+      });
+
+      const transporter = nodemailer.createTransport({
+        SES: {
+          ses: sesClient,
+          aws: { SendRawEmailCommand }
+        }
+      });
+
+      const testRecipient = credentials.testRecipient || credentials.fromEmail;
+      await transporter.sendMail({
+        from: credentials.fromEmail,
+        to: testRecipient,
+        subject: "SES test",
+        text: "This is a test email from the AWS SES sender."
+      });
+      successMessage = `SES test email sent to ${testRecipient}`;
     } else {
       if (!credentials.fromEmail) {
         return NextResponse.json(
