@@ -70,6 +70,30 @@ export interface SendCampaignResponse {
   }>;
 }
 
+export interface CampaignQueueMessage {
+  payloadMode?: "inline" | "s3";
+  leads?: {
+    filename: string;
+    content: string;
+  };
+  bankAccounts?: {
+    filename: string;
+    content: string;
+  };
+  letterTemplate?: string;
+  invoiceTemplate?: string;
+  storage?: {
+    bucket: string;
+    prefix: string;
+    leadsKey: string;
+    bankAccountsKey: string;
+    letterKey: string;
+    invoiceKey: string;
+  };
+  credentials: SmtpCredentials;
+  request: CampaignRequest;
+}
+
 export interface CampaignEvent {
   email: string;
   status: "success" | "failed";
