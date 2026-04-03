@@ -3,7 +3,12 @@ import { promises as fs } from "fs";
 import path from "path";
 import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import type { CampaignQueueMessage, CampaignRequest, SendCampaignResponse } from "@/lib/types";
+import type {
+  CampaignQueueMessage,
+  CampaignRequest,
+  SendCampaignResponse,
+  SmtpCredentials
+} from "@/lib/types";
 import { parseBankAccounts, parseLeads } from "@/lib/campaign/parsers";
 import { buildLogFilename } from "@/lib/campaign/logs";
 
@@ -20,6 +25,14 @@ const AWS_REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
 const SQS_QUEUE_URL = process.env.SQS_QUEUE_URL;
 const S3_BUCKET = process.env.S3_BUCKET;
 const S3_PREFIX = process.env.S3_PREFIX || "campaigns";
+const SES_REGION = process.env.SES_REGION || AWS_REGION;
+const SES_ACCESS_KEY_ID = process.env.SES_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
+const SES_SECRET_ACCESS_KEY =
+  process.env.SES_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
+const SES_SESSION_TOKEN = process.env.SES_SESSION_TOKEN || process.env.AWS_SESSION_TOKEN;
+const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL;
+const SES_REPLY_TO = process.env.SES_REPLY_TO;
+const SES_SENDER_NAME = process.env.SES_SENDER_NAME;
 const sqsClient = AWS_REGION ? new SQSClient({ region: AWS_REGION }) : null;
 const s3Client = AWS_REGION ? new S3Client({ region: AWS_REGION }) : null;
 
@@ -82,6 +95,33 @@ async function uploadTextObject(
   );
 }
 
+function getSesCredentials(): SmtpCredentials {
+  const sesRegion = SES_REGION;
+  const accessKeyId = SES_ACCESS_KEY_ID;
+  const secretAccessKey = SES_SECRET_ACCESS_KEY;
+  const fromEmail = SES_FROM_EMAIL;
+
+  if (!sesRegion || !accessKeyId || !secretAccessKey || !fromEmail) {
+    const missing: string[] = [];
+    if (!sesRegion) missing.push("SES_REGION/AWS_REGION");
+    if (!accessKeyId) missing.push("SES_ACCESS_KEY_ID/AWS_ACCESS_KEY_ID");
+    if (!secretAccessKey) missing.push("SES_SECRET_ACCESS_KEY/AWS_SECRET_ACCESS_KEY");
+    if (!fromEmail) missing.push("SES_FROM_EMAIL");
+    throw new Error(`Missing SES config: ${missing.join(", ")}`);
+  }
+
+  return {
+    mode: "ses",
+    sesRegion,
+    sesAccessKeyId: accessKeyId,
+    sesSecretAccessKey: secretAccessKey,
+    sesSessionToken: SES_SESSION_TOKEN,
+    fromEmail,
+    replyTo: SES_REPLY_TO || undefined,
+    senderName: SES_SENDER_NAME || undefined
+  };
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse<SendCampaignResponse>> {
   let campaignId: string | undefined;
   let enableStreaming = false;
@@ -93,20 +133,16 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
     const bankFile = formData.get("bankAccounts") as File | null;
     const letterFile = formData.get("letter") as File | null;
     const invoiceFile = formData.get("invoiceHtml") as File | null;
-    const credentialsRaw = formData.get("credentials") as string | null;
-
-    if (!leadsFile || !bankFile || !letterFile || !credentialsRaw) {
+    if (!leadsFile || !bankFile || !letterFile) {
       return NextResponse.json(
         {
           success: false,
           message: "Missing required files",
-          error: "leads, bankAccounts, letter, and credentials are required"
+          error: "leads, bankAccounts, and letter are required"
         },
         { status: 400 }
       );
     }
-
-    const credentials = JSON.parse(credentialsRaw);
     campaignId = String(formData.get("campaignId") || "").trim() || undefined;
     enableStreaming = String(formData.get("enableStreaming") || "") === "1";
     const invoicePrefixRaw = String(formData.get("invoicePrefix") || "").trim();
@@ -145,13 +181,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
     }
     const invoiceFilename = invoiceFile?.name || "invoice.html";
 
+    const senderEmail = String(formData.get("senderEmail") || "") || undefined;
+
     const requestConfig: CampaignRequest = {
       subjectPrefix: String(formData.get("subjectPrefix") || DEFAULT_SUBJECT_PREFIX),
       bodySubjectPrefix: String(formData.get("bodySubjectPrefix") || DEFAULT_BODY_SUBJECT_PREFIX),
       invoiceFilename: String(formData.get("invoiceFilename") || DEFAULT_INVOICE_FILENAME),
       letterTimezone: String(formData.get("letterTimezone") || DEFAULT_LETTER_TIMEZONE),
       attachmentTimezone: String(formData.get("attachmentTimezone") || DEFAULT_ATTACHMENT_TIMEZONE),
-      senderEmail: String(formData.get("senderEmail") || "") || undefined,
+      senderEmail,
       invoicePrefix,
       baseDateTime: String(formData.get("baseDateTime") || "") || undefined,
       campaignId,
@@ -166,6 +204,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
         ? Number(formData.get("interChunkDelayMs"))
         : 0
     };
+    const credentials = getSesCredentials();
     const { client: storageClient, bucket, prefix } = getStorageConfig();
     const storageId = campaignId || `campaign-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const storagePrefix = `${prefix}/${storageId}`;

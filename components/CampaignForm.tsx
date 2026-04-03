@@ -1,10 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { SmtpCredentials } from "@/lib/types";
-
 interface CampaignFormProps {
-  credentials: SmtpCredentials | null;
   isLoading: boolean;
   enableStreaming: boolean;
   onToggleStreaming: (value: boolean) => void;
@@ -15,7 +12,6 @@ interface CampaignFormProps {
 }
 
 export default function CampaignForm({
-  credentials,
   isLoading,
   enableStreaming,
   onToggleStreaming,
@@ -48,8 +44,6 @@ export default function CampaignForm({
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-
-    if (!credentials) return;
     if (!leadsFile || !bankFile || !letterFile) return;
 
     const payload = new FormData();
@@ -93,7 +87,7 @@ export default function CampaignForm({
   };
 
   const isInvoicePrefixValid = invoicePrefix.trim().length > 1 && invoicePrefix.trim() !== "$";
-  const isReady = credentials && leadsFile && bankFile && letterFile && isInvoicePrefixValid;
+  const isReady = leadsFile && bankFile && letterFile && isInvoicePrefixValid;
 
   return (
     <form
@@ -270,12 +264,6 @@ export default function CampaignForm({
           </span>
         </label>
       </div>
-
-      {!credentials && (
-        <div className="mt-4 rounded-2xl border border-clay-700/60 bg-clay-900/30 px-4 py-3 text-sm text-clay-200">
-          Connect SMTP first to enable sending.
-        </div>
-      )}
 
       <div className="mt-6 flex justify-end">
         <button

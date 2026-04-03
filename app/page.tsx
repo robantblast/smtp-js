@@ -14,7 +14,6 @@ import type {
 } from "@/lib/types";
 
 export default function Home() {
-  const [credentials, setCredentials] = useState<SmtpCredentials | null>(null);
   const [testResult, setTestResult] = useState<TestSmtpResponse | null>(null);
   const [campaignResult, setCampaignResult] = useState<SendCampaignResponse | null>(null);
   const [isTesting, setIsTesting] = useState(false);
@@ -80,20 +79,12 @@ export default function Home() {
 
       const data: TestSmtpResponse = await response.json();
       setTestResult(data);
-
-      if (data.success) {
-        const { testRecipient, ...persisted } = nextCredentials;
-        setCredentials(persisted);
-      } else {
-        setCredentials(null);
-      }
     } catch (error) {
       setTestResult({
         success: false,
         message: "SMTP test failed",
         error: error instanceof Error ? error.message : "Unknown error"
       });
-      setCredentials(null);
     } finally {
       setIsTesting(false);
     }
@@ -103,8 +94,6 @@ export default function Home() {
     payload: FormData,
     options: { campaignId?: string; enableStreaming: boolean }
   ) => {
-    if (!credentials) return;
-
     if (options.enableStreaming && options.campaignId) {
       setLiveStatus(null);
       setLiveCampaignId(options.campaignId);
@@ -117,8 +106,6 @@ export default function Home() {
     setCampaignResult(null);
 
     try {
-      payload.append("credentials", JSON.stringify(credentials));
-
       const response = await fetch("/api/send-campaign", {
         method: "POST",
         body: payload
@@ -227,7 +214,6 @@ export default function Home() {
 
         <section>
           <CampaignForm
-            credentials={credentials}
             isLoading={isSending}
             enableStreaming={streamingEnabled}
             onToggleStreaming={(value) => {
