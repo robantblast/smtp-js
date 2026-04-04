@@ -13,6 +13,8 @@ export default function ResultMessage({ title, result, onDismiss }: ResultMessag
     ? "bg-emerald-900/30 border-emerald-700/60"
     : "bg-rose-900/30 border-rose-700/60";
   const textTone = result.success ? "text-emerald-200" : "text-rose-200";
+  const campaignSummary = "summary" in result ? result.summary : undefined;
+  const logDownloadUrl = "logDownloadUrl" in result ? result.logDownloadUrl : undefined;
 
   return (
     <div className={`rounded-3xl border p-5 shadow-soft ${tone}`}>
@@ -23,15 +25,15 @@ export default function ResultMessage({ title, result, onDismiss }: ResultMessag
           {!result.success && result.error && (
             <p className="mt-2 text-xs text-ink-300">{result.error}</p>
           )}
-          {"summary" in result && result.summary && (
+          {campaignSummary && (
             <div className="mt-3 text-xs text-ink-200">
-              <p>Sent: {result.summary.sent}</p>
-              <p>Failed: {result.summary.failed}</p>
+              <p>Sent: {campaignSummary.sent}</p>
+              <p>Failed: {campaignSummary.failed}</p>
             </div>
           )}
-          {"logDownloadUrl" in result && result.logDownloadUrl && (
+          {campaignSummary && logDownloadUrl && (
             <a
-              href={result.logDownloadUrl}
+              href={logDownloadUrl}
               className="mt-3 inline-flex w-fit items-center rounded-full border border-ink-600 bg-ink-800/70 px-3 py-1 text-xs text-ink-200 hover:bg-ink-800"
             >
               Download sent log

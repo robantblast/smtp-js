@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 interface CampaignFormProps {
   isLoading: boolean;
   enableStreaming: boolean;
+  smtpMode: "sendgrid" | "ses" | null;
   onToggleStreaming: (value: boolean) => void;
   onSend: (
     payload: FormData,
@@ -14,6 +15,7 @@ interface CampaignFormProps {
 export default function CampaignForm({
   isLoading,
   enableStreaming,
+  smtpMode,
   onToggleStreaming,
   onSend
 }: CampaignFormProps) {
@@ -27,6 +29,7 @@ export default function CampaignForm({
   const [senderEmail, setSenderEmail] = useState("");
   const [invoicePrefix, setInvoicePrefix] = useState("$");
   const [baseDateTime, setBaseDateTime] = useState("");
+  const [skipValidation, setSkipValidation] = useState(false);
 
   const createCampaignId = () => {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -71,6 +74,14 @@ export default function CampaignForm({
       const delayValue = Number(delaySeconds);
       const msValue = Number.isFinite(delayValue) ? Math.max(0, delayValue) * 1000 : 0;
       payload.append("interChunkDelayMs", String(msValue));
+    }
+
+    if (smtpMode) {
+      payload.append("smtpMode", smtpMode);
+    }
+
+    if (skipValidation) {
+      payload.append("skipValidation", "1");
     }
 
     const campaignId = enableStreaming ? createCampaignId() : undefined;
@@ -230,8 +241,18 @@ export default function CampaignForm({
           />
           Live updates while sending
         </label>
-        <span className="text-xs text-ink-300">
-          Shows emails as they are sent. Turn off to reduce server polling.
+        <label className="flex items-center gap-3 text-sm text-ink-200">
+          <input
+            type="checkbox"
+            checked={skipValidation}
+            onChange={(event) => setSkipValidation(event.target.checked)}
+            className="h-4 w-4"
+          />
+          Skip lead validation before upload
+        </label>
+        <span className="text-xs text-ink-300 md:col-span-2">
+          Shows emails as they are sent. Turn off to reduce server polling. Skipping validation
+          uploads faster but bad leads will fail in the worker.
         </span>
       </div>
 

@@ -80,12 +80,12 @@ export function parseLeads(content: string, filename = "leads.json"): Lead[] {
     })
     .filter(Boolean) as Lead[];
 
-  const invalid = leads.filter((lead) => !emailRegex.test(lead.email));
-  if (invalid.length > 0) {
-    throw new Error(`Invalid lead emails: ${invalid.slice(0, 3).map((lead) => lead.email).join(", ")}`);
+  const validLeads = leads.filter((lead) => emailRegex.test(lead.email));
+  if (validLeads.length === 0) {
+    throw new Error("No valid lead emails found");
   }
 
-  return leads;
+  return validLeads;
 }
 
 export function parseBankAccounts(content: string): BankAccountsFile {

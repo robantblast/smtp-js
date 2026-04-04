@@ -8,6 +8,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<TestSmtpR
   try {
     const formData = await request.formData();
     const credentialsRaw = formData.get("credentials") as string | null;
+    const sendgridFromEmail = process.env.SENDGRID_FROM_EMAIL;
+    const sendgridApiKey = process.env.SENDGRID_API_KEY;
+    const sesFromEmail = process.env.SES_FROM_EMAIL;
+    const sesRegion = process.env.SES_REGION || process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
+    const sesAccessKeyId = process.env.SES_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
+    const sesSecretAccessKey =
+      process.env.SES_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
+    const sesSessionToken = process.env.SES_SESSION_TOKEN || process.env.AWS_SESSION_TOKEN;
 
     if (!credentialsRaw) {
       return NextResponse.json(
@@ -23,56 +31,70 @@ export async function POST(request: NextRequest): Promise<NextResponse<TestSmtpR
     let successMessage = "SMTP verified successfully";
 
     if (mode === "sendgrid") {
-      if (!credentials.apiKey) {
+      if (!sendgridApiKey) {
         return NextResponse.json(
-          { success: false, message: "Missing SendGrid API key", error: "apiKey is required" },
+          {
+            success: false,
+            message: "Missing SendGrid API key",
+            error: "SENDGRID_API_KEY is required"
+          },
           { status: 400 }
         );
       }
 
-      if (!credentials.fromEmail) {
+      const fromEmail = sendgridFromEmail;
+      if (!fromEmail) {
         return NextResponse.json(
-          { success: false, message: "Missing sender email", error: "fromEmail is required" },
+          {
+            success: false,
+            message: "Missing sender email",
+            error: "SENDGRID_FROM_EMAIL is required"
+          },
           { status: 400 }
         );
       }
 
-      sgMail.setApiKey(credentials.apiKey);
+      sgMail.setApiKey(sendgridApiKey);
 
-      const testRecipient = credentials.testRecipient || credentials.fromEmail;
+      const testRecipient = credentials.testRecipient || fromEmail;
       await sgMail.send({
         to: testRecipient,
-        from: credentials.fromEmail,
+        from: fromEmail,
         subject: "SendGrid test",
         text: "This is a SendGrid API test from the SMTP tester.",
         html: "<p>This is a SendGrid API test from the SMTP tester.</p>"
       } as any);
       successMessage = `SendGrid test email sent to ${testRecipient}`;
     } else if (mode === "ses") {
-      if (!credentials.fromEmail) {
+      const fromEmail = sesFromEmail;
+      if (!fromEmail) {
         return NextResponse.json(
-          { success: false, message: "Missing sender email", error: "fromEmail is required" },
+          {
+            success: false,
+            message: "Missing sender email",
+            error: "SES_FROM_EMAIL is required"
+          },
           { status: 400 }
         );
       }
 
-      if (!credentials.sesRegion || !credentials.sesAccessKeyId || !credentials.sesSecretAccessKey) {
+      if (!sesRegion || !sesAccessKeyId || !sesSecretAccessKey) {
         return NextResponse.json(
           {
             success: false,
             message: "Missing SES credentials",
-            error: "sesRegion, sesAccessKeyId, and sesSecretAccessKey are required"
+            error: "SES_REGION/AWS_REGION, SES_ACCESS_KEY_ID, and SES_SECRET_ACCESS_KEY are required"
           },
           { status: 400 }
         );
       }
 
       const sesClient = new SESClient({
-        region: credentials.sesRegion,
+        region: sesRegion,
         credentials: {
-          accessKeyId: credentials.sesAccessKeyId,
-          secretAccessKey: credentials.sesSecretAccessKey,
-          sessionToken: credentials.sesSessionToken || undefined
+          accessKeyId: sesAccessKeyId,
+          secretAccessKey: sesSecretAccessKey,
+          sessionToken: sesSessionToken || undefined
         }
       });
 
@@ -83,45 +105,19 @@ export async function POST(request: NextRequest): Promise<NextResponse<TestSmtpR
         }
       });
 
-      const testRecipient = credentials.testRecipient || credentials.fromEmail;
+      const testRecipient = credentials.testRecipient || fromEmail;
       await transporter.sendMail({
-        from: credentials.fromEmail,
+        from: fromEmail,
         to: testRecipient,
         subject: "SES test",
         text: "This is a test email from the AWS SES sender."
       });
       successMessage = `SES test email sent to ${testRecipient}`;
     } else {
-      if (!credentials.fromEmail) {
-        return NextResponse.json(
-          { success: false, message: "Missing sender email", error: "fromEmail is required" },
-          { status: 400 }
-        );
-      }
-
-      const transporter = nodemailer.createTransport({
-        host: credentials.host,
-        port: credentials.port,
-        secure: credentials.secure,
-        auth: {
-          user: credentials.username,
-          pass: credentials.password
-        },
-        tls: {
-          rejectUnauthorized: false
-        }
-      });
-
-      await transporter.verify();
-
-      const testRecipient = credentials.testRecipient || credentials.fromEmail;
-      await transporter.sendMail({
-        from: credentials.fromEmail,
-        to: testRecipient,
-        subject: "SMTP test",
-        text: "This is a test email from the SMTP tester."
-      });
-      successMessage = `SMTP test email sent to ${testRecipient}`;
+      return NextResponse.json(
+        { success: false, message: "Unsupported mode", error: "mode must be sendgrid or ses" },
+        { status: 400 }
+      );
     }
 
     return NextResponse.json({

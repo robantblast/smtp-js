@@ -14,7 +14,7 @@ import { buildLogFilename } from "@/lib/campaign/logs";
 
 export const runtime = "nodejs";
 
-const DEFAULT_SUBJECT_PREFIX = "Fw: ";
+const DEFAULT_SUBJECT_PREFIX = "";
 const DEFAULT_BODY_SUBJECT_PREFIX = "";
 const DEFAULT_INVOICE_FILENAME = "lNVRNUMBER.pdf";
 const DEFAULT_LETTER_TIMEZONE = "Australia/Adelaide";
@@ -25,6 +25,10 @@ const AWS_REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
 const SQS_QUEUE_URL = process.env.SQS_QUEUE_URL;
 const S3_BUCKET = process.env.S3_BUCKET;
 const S3_PREFIX = process.env.S3_PREFIX || "campaigns";
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL;
+const SENDGRID_REPLY_TO = process.env.SENDGRID_REPLY_TO;
+const SENDGRID_SENDER_NAME = process.env.SENDGRID_SENDER_NAME;
 const SES_REGION = process.env.SES_REGION || AWS_REGION;
 const SES_ACCESS_KEY_ID = process.env.SES_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
 const SES_SECRET_ACCESS_KEY =
@@ -122,6 +126,33 @@ function getSesCredentials(): SmtpCredentials {
   };
 }
 
+function getSendgridCredentials(senderEmailOverride?: string): SmtpCredentials {
+  if (!SENDGRID_API_KEY) {
+    throw new Error("Missing SendGrid config: SENDGRID_API_KEY is required");
+  }
+
+  const fromEmail = SENDGRID_FROM_EMAIL || senderEmailOverride;
+  if (!fromEmail) {
+    throw new Error("Missing SendGrid config: SENDGRID_FROM_EMAIL is required");
+  }
+
+  return {
+    mode: "sendgrid",
+    apiKey: SENDGRID_API_KEY,
+    fromEmail,
+    replyTo: SENDGRID_REPLY_TO || undefined,
+    senderName: SENDGRID_SENDER_NAME || undefined
+  };
+}
+
+function resolveSmtpMode(value: string | null): SmtpCredentials["mode"] | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "sendgrid") return "sendgrid";
+  if (normalized === "ses") return "ses";
+  return null;
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse<SendCampaignResponse>> {
   let campaignId: string | undefined;
   let enableStreaming = false;
@@ -162,14 +193,29 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
       ? invoicePrefixRaw
       : `$${invoicePrefixRaw}`;
 
+    const smtpMode = resolveSmtpMode(formData.get("smtpMode") as string | null);
+    if (!smtpMode) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Missing SMTP provider",
+          error: "smtpMode must be sendgrid or ses"
+        },
+        { status: 400 }
+      );
+    }
+
     const leadsFilename = leadsFile.name || "leads.json";
     const leadsContent = await leadsFile.text();
     const bankFilename = bankFile.name || "bankAccounts.json";
     const bankAccountsContent = await bankFile.text();
     const letterTemplate = await letterFile.text();
     const letterFilename = letterFile.name || "letter.txt";
-    parseLeads(leadsContent, leadsFilename);
-    parseBankAccounts(bankAccountsContent);
+    const skipValidation = String(formData.get("skipValidation") || "") === "1";
+    if (!skipValidation) {
+      parseLeads(leadsContent, leadsFilename);
+      parseBankAccounts(bankAccountsContent);
+    }
     const logFilename = buildLogFilename(leadsFilename);
 
     let invoiceTemplate = "";
@@ -184,7 +230,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
     const senderEmail = String(formData.get("senderEmail") || "") || undefined;
 
     const requestConfig: CampaignRequest = {
-      subjectPrefix: String(formData.get("subjectPrefix") || DEFAULT_SUBJECT_PREFIX),
+      subjectPrefix: String(formData.get("subjectPrefix") || DEFAULT_SUBJECT_PREFIX || ""),
       bodySubjectPrefix: String(formData.get("bodySubjectPrefix") || DEFAULT_BODY_SUBJECT_PREFIX),
       invoiceFilename: String(formData.get("invoiceFilename") || DEFAULT_INVOICE_FILENAME),
       letterTimezone: String(formData.get("letterTimezone") || DEFAULT_LETTER_TIMEZONE),
@@ -204,7 +250,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
         ? Number(formData.get("interChunkDelayMs"))
         : 0
     };
-    const credentials = getSesCredentials();
+    const credentials =
+      smtpMode === "ses" ? getSesCredentials() : getSendgridCredentials(senderEmail);
     const { client: storageClient, bucket, prefix } = getStorageConfig();
     const storageId = campaignId || `campaign-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const storagePrefix = `${prefix}/${storageId}`;
@@ -282,7 +329,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
 
     return NextResponse.json({
       success: true,
-      message: "Campaign queued",
+      message: "Sending in progress",
       campaignId,
       logFilename,
       logDownloadUrl: `/api/campaign-log?filename=${encodeURIComponent(logFilename)}`

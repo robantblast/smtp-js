@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { SMTP_CONFIGS } from "@/lib/smtp-configs";
 import type { SmtpCredentials } from "@/lib/types";
 
@@ -11,68 +11,23 @@ interface SmtpFormProps {
 
 export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
   const [provider, setProvider] = useState("SendGrid");
-  const [useSendgridApi, setUseSendgridApi] = useState(true);
-  const [apiKey, setApiKey] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [senderName, setSenderName] = useState("");
-  const [fromEmail, setFromEmail] = useState("");
-  const [replyTo, setReplyTo] = useState("");
   const [testRecipient, setTestRecipient] = useState("");
-  const [customHost, setCustomHost] = useState("");
-  const [customPort, setCustomPort] = useState("587");
-  const [customSecure, setCustomSecure] = useState(false);
-  const [sesRegion, setSesRegion] = useState("");
-  const [sesAccessKeyId, setSesAccessKeyId] = useState("");
-  const [sesSecretAccessKey, setSesSecretAccessKey] = useState("");
-  const [sesSessionToken, setSesSessionToken] = useState("");
-
-  const selectedConfig = useMemo(
-    () => SMTP_CONFIGS.find((item) => item.name === provider),
-    [provider]
-  );
 
   const isSendgrid = provider === "SendGrid";
   const isSes = provider === "Amazon SES";
-  const showCustom = provider === "Custom";
-  const useApiMode = isSendgrid && useSendgridApi;
-  const useSmtp = !useApiMode && !isSes;
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
 
     const credentials: SmtpCredentials = {
-      mode: isSes ? "ses" : useApiMode ? "sendgrid" : "smtp",
-      apiKey: useApiMode ? apiKey : undefined,
-      username: useSmtp ? username : undefined,
-      password: useSmtp ? password : undefined,
-      host: useSmtp ? (showCustom ? customHost : selectedConfig?.host || "") : undefined,
-      port: useSmtp ? (showCustom ? Number(customPort) : selectedConfig?.port || 587) : undefined,
-      secure: useSmtp ? (showCustom ? customSecure : selectedConfig?.secure || false) : undefined,
-      sesRegion: isSes ? sesRegion.trim() || undefined : undefined,
-      sesAccessKeyId: isSes ? sesAccessKeyId.trim() || undefined : undefined,
-      sesSecretAccessKey: isSes ? sesSecretAccessKey.trim() || undefined : undefined,
-      sesSessionToken: isSes ? sesSessionToken.trim() || undefined : undefined,
-      senderName: senderName.trim() || undefined,
-      fromEmail: fromEmail.trim() || undefined,
-      replyTo: replyTo.trim() || undefined,
+      mode: isSes ? "ses" : "sendgrid",
       testRecipient: testRecipient.trim() || undefined
     };
 
     onTest(credentials);
   };
 
-  const isValid = () => {
-    if (isSes) {
-      return Boolean(sesRegion && sesAccessKeyId && sesSecretAccessKey && fromEmail);
-    }
-    if (useApiMode) {
-      return Boolean(apiKey && fromEmail);
-    }
-    if (!username || !password) return false;
-    if (showCustom) return Boolean(customHost && customPort && fromEmail);
-    return Boolean(selectedConfig && fromEmail);
-  };
+  const isValid = () => Boolean(provider);
 
   return (
     <form
@@ -103,141 +58,6 @@ export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
           </select>
         </label>
 
-        {isSendgrid && (
-          <label className="flex items-center gap-3 text-sm text-ink-200">
-            <input
-              type="checkbox"
-              checked={useSendgridApi}
-              onChange={(event) => setUseSendgridApi(event.target.checked)}
-              className="h-4 w-4"
-            />
-            Use SG API key
-          </label>
-        )}
-
-        {isSes ? (
-          <>
-            <label className="flex flex-col gap-2 text-sm">
-              <span className="text-ink-200">SES Region</span>
-              <input
-                type="text"
-                value={sesRegion}
-                onChange={(event) => setSesRegion(event.target.value)}
-                className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
-                placeholder="us-east-1"
-                required
-              />
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm">
-              <span className="text-ink-200">SES Access Key ID</span>
-              <input
-                type="text"
-                value={sesAccessKeyId}
-                onChange={(event) => setSesAccessKeyId(event.target.value)}
-                className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
-                placeholder="AKIA..."
-                required
-              />
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm md:col-span-2">
-              <span className="text-ink-200">SES Secret Access Key</span>
-              <input
-                type="password"
-                value={sesSecretAccessKey}
-                onChange={(event) => setSesSecretAccessKey(event.target.value)}
-                className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
-                placeholder="Your secret key"
-                required
-              />
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm md:col-span-2">
-              <span className="text-ink-200">Session Token (optional)</span>
-              <input
-                type="password"
-                value={sesSessionToken}
-                onChange={(event) => setSesSessionToken(event.target.value)}
-                className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
-                placeholder="Required for temporary credentials"
-              />
-            </label>
-          </>
-        ) : useApiMode ? (
-          <label className="flex flex-col gap-2 text-sm md:col-span-2">
-            <span className="text-ink-200">SG API Key</span>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-              className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
-              placeholder="SG.xxxxx"
-              required
-            />
-          </label>
-        ) : (
-          <>
-            <label className="flex flex-col gap-2 text-sm">
-              <span className="text-ink-200">SMTP Username</span>
-              <input
-                type="text"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
-                placeholder="apikey or user@example.com"
-                required
-              />
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm">
-              <span className="text-ink-200">SMTP Password</span>
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
-                placeholder="Password or API key"
-                required
-              />
-            </label>
-          </>
-        )}
-
-        <label className="flex flex-col gap-2 text-sm">
-          <span className="text-ink-200">Sender Name (optional)</span>
-          <input
-            type="text"
-            value={senderName}
-            onChange={(event) => setSenderName(event.target.value)}
-            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
-            placeholder="Finance Desk"
-          />
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm">
-          <span className="text-ink-200">From Email (required)</span>
-          <input
-            type="email"
-            value={fromEmail}
-            onChange={(event) => setFromEmail(event.target.value)}
-            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
-            placeholder="billing@yourdomain.com"
-            required
-          />
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm">
-          <span className="text-ink-200">Reply-To (optional)</span>
-          <input
-            type="email"
-            value={replyTo}
-            onChange={(event) => setReplyTo(event.target.value)}
-            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
-            placeholder="support@yourdomain.com"
-          />
-        </label>
-
         <label className="flex flex-col gap-2 text-sm md:col-span-2">
           <span className="text-ink-200">Test recipient (optional)</span>
           <input
@@ -253,51 +73,10 @@ export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
         </label>
       </div>
 
-      {showCustom && useSmtp && (
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="text-ink-200">Host</span>
-            <input
-              type="text"
-              value={customHost}
-              onChange={(event) => setCustomHost(event.target.value)}
-              className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
-              placeholder="smtp.example.com"
-              required
-            />
-          </label>
-          <label className="flex flex-col gap-2 text-sm">
-            <span className="text-ink-200">Port</span>
-            <input
-              type="number"
-              value={customPort}
-              onChange={(event) => setCustomPort(event.target.value)}
-              className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
-              placeholder="587"
-              required
-            />
-          </label>
-          <label className="flex items-center gap-3 text-sm text-ink-200">
-            <input
-              type="checkbox"
-              checked={customSecure}
-              onChange={(event) => setCustomSecure(event.target.checked)}
-              className="h-4 w-4"
-            />
-            Use SSL/TLS
-          </label>
-        </div>
-      )}
-
       <div className="mt-6 flex items-center justify-between">
         <div className="text-xs text-ink-300">
-          {selectedConfig && !showCustom && !useApiMode && !isSes && (
-            <span>
-              {selectedConfig.host}:{selectedConfig.port} ({selectedConfig.secure ? "SSL" : "STARTTLS"})
-            </span>
-          )}
-          {useApiMode && <span>SG API mode enabled</span>}
-          {isSes && <span>SES API mode enabled</span>}
+          {isSendgrid && <span>SendGrid API mode (env credentials)</span>}
+          {isSes && <span>SES API mode (env credentials)</span>}
         </div>
         <button
           type="submit"
