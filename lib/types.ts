@@ -30,7 +30,7 @@ export interface BankAccountsFile {
 }
 
 export interface SmtpCredentials {
-  mode: "sendgrid" | "ses";
+  mode: "smtp" | "sendgrid" | "ses";
   username?: string;
   password?: string;
   host?: string;

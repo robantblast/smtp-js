@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
-import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type {
-  CampaignQueueMessage,
   CampaignRequest,
   SendCampaignResponse,
   SmtpCredentials
 } from "@/lib/types";
 import { parseBankAccounts, parseLeads } from "@/lib/campaign/parsers";
 import { buildLogFilename } from "@/lib/campaign/logs";
+import { sendCampaign } from "@/lib/campaign/sender";
 
 export const runtime = "nodejs";
 
@@ -19,17 +17,12 @@ const DEFAULT_BODY_SUBJECT_PREFIX = "";
 const DEFAULT_INVOICE_FILENAME = "lNVRNUMBER.pdf";
 const DEFAULT_LETTER_TIMEZONE = "Australia/Adelaide";
 const DEFAULT_ATTACHMENT_TIMEZONE = "America/Los_Angeles";
-const MAX_SQS_MESSAGE_BYTES = 256 * 1024;
 
-const AWS_REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
-const SQS_QUEUE_URL = process.env.SQS_QUEUE_URL;
-const S3_BUCKET = process.env.S3_BUCKET;
-const S3_PREFIX = process.env.S3_PREFIX || "campaigns";
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL;
 const SENDGRID_REPLY_TO = process.env.SENDGRID_REPLY_TO;
 const SENDGRID_SENDER_NAME = process.env.SENDGRID_SENDER_NAME;
-const SES_REGION = process.env.SES_REGION || AWS_REGION;
+const SES_REGION = process.env.SES_REGION || process.env.AWS_REGION;
 const SES_ACCESS_KEY_ID = process.env.SES_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
 const SES_SECRET_ACCESS_KEY =
   process.env.SES_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
@@ -37,67 +30,6 @@ const SES_SESSION_TOKEN = process.env.SES_SESSION_TOKEN || process.env.AWS_SESSI
 const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL;
 const SES_REPLY_TO = process.env.SES_REPLY_TO;
 const SES_SENDER_NAME = process.env.SES_SENDER_NAME;
-const sqsClient = AWS_REGION ? new SQSClient({ region: AWS_REGION }) : null;
-const s3Client = AWS_REGION ? new S3Client({ region: AWS_REGION }) : null;
-
-function resolveContentType(filename: string, fallback: string): string {
-  const ext = path.extname(filename).toLowerCase();
-  if (ext === ".json") return "application/json";
-  if (ext === ".js") return "text/javascript";
-  if (ext === ".html" || ext === ".htm") return "text/html";
-  if (ext === ".txt") return "text/plain";
-  return fallback;
-}
-
-function getQueueConfig() {
-  if (!AWS_REGION) {
-    throw new Error("AWS region is required (set AWS_REGION)");
-  }
-
-  if (!SQS_QUEUE_URL) {
-    throw new Error("SQS queue URL is required (set SQS_QUEUE_URL)");
-  }
-
-  if (!sqsClient) {
-    throw new Error("SQS client failed to initialize");
-  }
-
-  return { client: sqsClient, queueUrl: SQS_QUEUE_URL };
-}
-
-function getStorageConfig() {
-  if (!AWS_REGION) {
-    throw new Error("AWS region is required (set AWS_REGION)");
-  }
-
-  if (!S3_BUCKET) {
-    throw new Error("S3 bucket is required (set S3_BUCKET)");
-  }
-
-  if (!s3Client) {
-    throw new Error("S3 client failed to initialize");
-  }
-
-  const prefix = S3_PREFIX.replace(/\/+$/g, "");
-  return { client: s3Client, bucket: S3_BUCKET, prefix: prefix || "campaigns" };
-}
-
-async function uploadTextObject(
-  client: S3Client,
-  bucket: string,
-  key: string,
-  body: string,
-  contentType: string
-) {
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: body,
-      ContentType: contentType
-    })
-  );
-}
 
 function getSesCredentials(): SmtpCredentials {
   const sesRegion = SES_REGION;
@@ -207,15 +139,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
 
     const leadsFilename = leadsFile.name || "leads.json";
     const leadsContent = await leadsFile.text();
-    const bankFilename = bankFile.name || "bankAccounts.json";
     const bankAccountsContent = await bankFile.text();
     const letterTemplate = await letterFile.text();
-    const letterFilename = letterFile.name || "letter.txt";
     const skipValidation = String(formData.get("skipValidation") || "") === "1";
-    if (!skipValidation) {
-      parseLeads(leadsContent, leadsFilename);
-      parseBankAccounts(bankAccountsContent);
-    }
+    
+    const leads = skipValidation 
+      ? parseLeads(leadsContent, leadsFilename)
+      : parseLeads(leadsContent, leadsFilename);
+    const bankAccounts = parseBankAccounts(bankAccountsContent);
+    
     const logFilename = buildLogFilename(leadsFilename);
 
     let invoiceTemplate = "";
@@ -225,7 +157,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
       const invoicePath = path.join(process.cwd(), "invoice.html");
       invoiceTemplate = await fs.readFile(invoicePath, "utf-8");
     }
-    const invoiceFilename = invoiceFile?.name || "invoice.html";
 
     const senderEmail = String(formData.get("senderEmail") || "") || undefined;
 
@@ -250,89 +181,31 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
         ? Number(formData.get("interChunkDelayMs"))
         : 0
     };
+
     const credentials =
       smtpMode === "ses" ? getSesCredentials() : getSendgridCredentials(senderEmail);
-    const { client: storageClient, bucket, prefix } = getStorageConfig();
-    const storageId = campaignId || `campaign-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const storagePrefix = `${prefix}/${storageId}`;
 
-    const leadsKey = `${storagePrefix}/${path.basename(leadsFilename)}`;
-    const bankAccountsKey = `${storagePrefix}/${path.basename(bankFilename)}`;
-    const letterKey = `${storagePrefix}/${path.basename(letterFilename)}`;
-    const invoiceKey = `${storagePrefix}/${path.basename(invoiceFilename)}`;
-
-    await Promise.all([
-      uploadTextObject(
-        storageClient,
-        bucket,
-        leadsKey,
-        leadsContent,
-        resolveContentType(leadsFilename, "application/json")
-      ),
-      uploadTextObject(
-        storageClient,
-        bucket,
-        bankAccountsKey,
-        bankAccountsContent,
-        "application/json"
-      ),
-      uploadTextObject(
-        storageClient,
-        bucket,
-        letterKey,
-        letterTemplate,
-        resolveContentType(letterFilename, "text/plain")
-      ),
-      uploadTextObject(
-        storageClient,
-        bucket,
-        invoiceKey,
-        invoiceTemplate,
-        resolveContentType(invoiceFilename, "text/html")
-      )
-    ]);
-
-    const message: CampaignQueueMessage = {
-      payloadMode: "s3",
-      storage: {
-        bucket,
-        prefix: storagePrefix,
-        leadsKey,
-        bankAccountsKey,
-        letterKey,
-        invoiceKey
-      },
+    // Run the campaign directly (no SQS queue)
+    const summary = await sendCampaign({
+      leads,
+      bankAccounts,
+      letterTemplate,
+      invoiceTemplate,
       credentials,
       request: requestConfig
-    };
-
-    const messageBody = JSON.stringify(message);
-    const messageBytes = Buffer.byteLength(messageBody, "utf8");
-    if (messageBytes > MAX_SQS_MESSAGE_BYTES) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Campaign payload too large",
-          error: "SQS message must be under 256 KB; store payload in S3 and send a reference"
-        },
-        { status: 413 }
-      );
-    }
-
-    const { client, queueUrl } = getQueueConfig();
-    await client.send(
-      new SendMessageCommand({
-        QueueUrl: queueUrl,
-        MessageBody: messageBody
-      })
-    );
+    });
 
     return NextResponse.json({
       success: true,
-      message: "Sending in progress",
+      message: summary.failed === 0 ? "Campaign completed successfully" : "Campaign completed with some failures",
       campaignId,
       logFilename,
-      logDownloadUrl: `/api/campaign-log?filename=${encodeURIComponent(logFilename)}`
+      logDownloadUrl: `/api/campaign-log?filename=${encodeURIComponent(logFilename)}`,
+      summary: {
+        sent: summary.sent,
+        failed: summary.failed
+      },
+      failures: summary.failures.map(f => ({ email: f.email, error: f.error || "Unknown error" }))
     });
   } catch (error) {
     console.error("send-campaign failed", error);

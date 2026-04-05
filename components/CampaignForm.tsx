@@ -3,20 +3,13 @@
 import { useState, type FormEvent } from "react";
 interface CampaignFormProps {
   isLoading: boolean;
-  enableStreaming: boolean;
-  smtpMode: "sendgrid" | "ses" | null;
-  onToggleStreaming: (value: boolean) => void;
-  onSend: (
-    payload: FormData,
-    options: { campaignId?: string; enableStreaming: boolean }
-  ) => void;
+  smtpMode: "smtp" | "sendgrid" | "ses" | null;
+  onSend: (payload: FormData) => void;
 }
 
 export default function CampaignForm({
   isLoading,
-  enableStreaming,
   smtpMode,
-  onToggleStreaming,
   onSend
 }: CampaignFormProps) {
   const [leadsFile, setLeadsFile] = useState<File | null>(null);
@@ -30,13 +23,6 @@ export default function CampaignForm({
   const [invoicePrefix, setInvoicePrefix] = useState("$");
   const [baseDateTime, setBaseDateTime] = useState("");
   const [skipValidation, setSkipValidation] = useState(false);
-
-  const createCampaignId = () => {
-    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-      return crypto.randomUUID();
-    }
-    return `campaign-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  };
 
   const normalizeInvoicePrefix = (value: string) => {
     const trimmed = value.trimStart();
@@ -84,17 +70,7 @@ export default function CampaignForm({
       payload.append("skipValidation", "1");
     }
 
-    const campaignId = enableStreaming ? createCampaignId() : undefined;
-    if (enableStreaming) {
-      payload.append("enableStreaming", "1");
-      if (campaignId) {
-        payload.append("campaignId", campaignId);
-      }
-    } else {
-      payload.append("enableStreaming", "0");
-    }
-
-    onSend(payload, { campaignId, enableStreaming });
+    onSend(payload);
   };
 
   const isInvoicePrefixValid = invoicePrefix.trim().length > 1 && invoicePrefix.trim() !== "$";
@@ -235,24 +211,14 @@ export default function CampaignForm({
         <label className="flex items-center gap-3 text-sm text-ink-200">
           <input
             type="checkbox"
-            checked={enableStreaming}
-            onChange={(event) => onToggleStreaming(event.target.checked)}
-            className="h-4 w-4"
-          />
-          Live updates while sending
-        </label>
-        <label className="flex items-center gap-3 text-sm text-ink-200">
-          <input
-            type="checkbox"
             checked={skipValidation}
             onChange={(event) => setSkipValidation(event.target.checked)}
             className="h-4 w-4"
           />
           Skip lead validation before upload
         </label>
-        <span className="text-xs text-ink-300 md:col-span-2">
-          Shows emails as they are sent. Turn off to reduce server polling. Skipping validation
-          uploads faster but bad leads will fail in the worker.
+        <span className="text-xs text-ink-300">
+          Skipping validation uploads faster but bad leads will fail during send.
         </span>
       </div>
 

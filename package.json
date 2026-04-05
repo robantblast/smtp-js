@@ -10,12 +10,10 @@
   },
   "dependencies": {
     "@aws-sdk/client-ses": "^3.1022.0",
-    "@aws-sdk/client-s3": "^3.1022.0",
-    "@aws-sdk/client-sqs": "^3.1022.0",
     "@sendgrid/mail": "^8.1.6",
     "next": "14.0.4",
     "nodemailer": "^6.9.7",
-    "pusher-js": "^8.4.0",
+    "playwright": "^1.44.1",
     "react": "^18",
     "react-dom": "^18"
   },
