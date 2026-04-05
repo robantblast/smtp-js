@@ -23,6 +23,8 @@ export default function CampaignForm({
   const [invoicePrefix, setInvoicePrefix] = useState("$");
   const [baseDateTime, setBaseDateTime] = useState("");
   const [skipValidation, setSkipValidation] = useState(false);
+  const [addressLine1, setAddressLine1] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
 
   const normalizeInvoicePrefix = (value: string) => {
     const trimmed = value.trimStart();
@@ -68,6 +70,13 @@ export default function CampaignForm({
 
     if (skipValidation) {
       payload.append("skipValidation", "1");
+    }
+
+    if (addressLine1.trim()) {
+      payload.append("addressLine1", addressLine1.trim());
+    }
+    if (addressLine2.trim()) {
+      payload.append("addressLine2", addressLine2.trim());
     }
 
     onSend(payload);
@@ -220,6 +229,32 @@ export default function CampaignForm({
         <span className="text-xs text-ink-300">
           Skipping validation uploads faster but bad leads will fail during send.
         </span>
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="text-ink-200">Address Line 1 (optional)</span>
+          <input
+            type="text"
+            value={addressLine1}
+            onChange={(event) => setAddressLine1(event.target.value)}
+            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
+            placeholder="5060 California Avenue"
+          />
+        </label>
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="text-ink-200">Address Line 2 (optional)</span>
+          <input
+            type="text"
+            value={addressLine2}
+            onChange={(event) => setAddressLine2(event.target.value)}
+            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
+            placeholder="Bakersfield, CA 93309"
+          />
+          <span className="text-xs text-ink-300">
+            Overrides BANKADDRESS1, BANKADDRESS2, BANKADDRESSW91, BANKADDRESSW92 placeholders.
+          </span>
+        </label>
       </div>
 
 

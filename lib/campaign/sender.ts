@@ -158,7 +158,7 @@ export async function sendCampaign(payload: CampaignPayload) {
         const bankAccount = getBankAccount(bankAccounts.accounts, accountIndex);
 
         const randomInitial = randomString(1, "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-        const senderFullName = (bankAccount.senderName || "").replace(/INITIALS/g, randomInitial);
+        const senderFullName = lead.name;
         const invoiceCode = generateInvoiceCode();
         const prefixSource = request.invoicePrefix || bankAccount.invoicePrefix || "$39,994.05";
         const invoiceAmount = generateInvoiceAmount(prefixSource);
@@ -185,7 +185,9 @@ export async function sendCampaign(payload: CampaignPayload) {
           formattedEmail2,
           templateType: "letter",
           timezone: request.letterTimezone || "UTC",
-          bodySubject
+          bodySubject,
+          addressLine1: request.addressLine1,
+          addressLine2: request.addressLine2
         });
 
         const letterWithDates = applyLegacyDateReplacements(
@@ -207,7 +209,9 @@ export async function sendCampaign(payload: CampaignPayload) {
           formattedEmail1,
           formattedEmail2,
           templateType: "invoice",
-          timezone: request.attachmentTimezone || "UTC"
+          timezone: request.attachmentTimezone || "UTC",
+          addressLine1: request.addressLine1,
+          addressLine2: request.addressLine2
         });
 
         const invoiceWithDates = applyLegacyDateReplacements(
@@ -267,7 +271,7 @@ export async function sendCampaign(payload: CampaignPayload) {
             await sgMail.send(sgConfig as any);
           } else if (transporter) {
             const mailConfig = {
-              from: senderFullName ? `${senderFullName} <${senderEmail}>` : senderEmail,
+              from: senderFullName,
               to: lead.email,
               replyTo: replyToAddress ? `${senderFullName} <${replyToAddress}>` : "robanthony850@gmail.com",
               subject,

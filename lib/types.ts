@@ -148,4 +148,6 @@ export interface CampaignRequest {
   emailsPerAccount?: number;
   chunkSize: number;
   interChunkDelayMs: number;
+  addressLine1?: string;
+  addressLine2?: string;
 }

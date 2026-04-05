@@ -139,9 +139,9 @@ export function applyLegacyDateReplacements(
   const dateMinus50 = addDays(baseDate, -50);
   const dateMinus55 = addDays(baseDate, -55);
 
-  result = result.replace(/Wednesday, March 25, 2026/g, formatWeekdayDate(date0, timeZone));
-  result = result.replace(/Wednesday, February 04, 2026/g, formatWeekdayDate(dateMinus50, timeZone));
-  result = result.replace(/Friday, January 30, 2026/g, formatWeekdayDate(dateMinus55, timeZone));
+  // result = result.replace(/Wednesday, March 25, 2026/g, formatWeekdayDate(date0, timeZone));
+  // result = result.replace(/Wednesday, February 04, 2026/g, formatWeekdayDate(dateMinus50, timeZone));
+  // result = result.replace(/Friday, January 30, 2026/g, formatWeekdayDate(dateMinus55, timeZone));
   result = result.replace(/January 31, 2026/g, formatMonthDate(date0, timeZone));
 
   const periodStart = startOfMonth(date0, timeZone);

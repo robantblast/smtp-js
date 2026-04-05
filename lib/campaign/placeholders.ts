@@ -127,6 +127,8 @@ export interface TemplateContext {
   templateType: "letter" | "invoice";
   timezone: string;
   bodySubject?: string;
+  addressLine1?: string;
+  addressLine2?: string;
 }
 
 export async function applyTemplate(template: string, context: TemplateContext): Promise<string> {
@@ -196,7 +198,7 @@ export async function applyTemplate(template: string, context: TemplateContext):
 
   result = result.replace(/RP2EMAIL/g, context.replyToEmail);
   result = result.replace(/SENDERNAME/g, (bankAccount.senderName || "").toUpperCase());
-  result = result.replace(/SIGNATURE/g, createSignature(bankAccount.senderName || ""));
+  result = result.replace(/SIGNATURE/g, createSignature(lead.name || ""));
   result = result.replace(/SHOLA/g, formatShola(bankAccount.shola));
   result = result.replace(/EINDATA/g, formatEin(bankAccount.ein));
 
@@ -204,23 +206,20 @@ export async function applyTemplate(template: string, context: TemplateContext):
   const defaultAddressLine2 = "BAKERSFIELD, CA 93309";
 
   const bankAddress = bankAccount.bankAddress || "";
-  const addressLine1 = bankAccount.addressLine1 || bankAccount.bankAddress || "";
-  const addressLine2 = bankAccount.addressLine2 || "";
-  const hasAddressOverride = Boolean(addressLine1 || addressLine2);
+  const addressLine1 = context.addressLine1 || defaultAddressLine1;
+  const addressLine2 = context.addressLine2 || defaultAddressLine2;
   const resolvedAddressLine1 = addressLine1 || defaultAddressLine1;
-  const resolvedAddressLine2 = addressLine2 || (hasAddressOverride && addressLine1 ? "" : defaultAddressLine2);
+  const resolvedAddressLine2 = addressLine2 || defaultAddressLine2;
   const titleAddressLine1 = toTitleCase(resolvedAddressLine1);
   const titleAddressLine2 = toTitleCase(resolvedAddressLine2);
 
   result = result.replace(/BANKNAME/g, bankAccount.bankName || "");
   result = result.replace(/BANKADDRESS/g, bankAddress);
-  result = result.replace(/BANKADDRESS1/g, resolvedAddressLine1);
-  result = result.replace(/BANKADDRESS2/g, resolvedAddressLine2);
+  result = result.replace(/SMALLADRSINVOICEONE/g, resolvedAddressLine1);
+  result = result.replace(/SMALLADRSINVOICETWO/g, resolvedAddressLine2);
 
-  if (hasAddressOverride) {
-    result = result.replace(/BANKADDRESSW91/g, titleAddressLine1);
-    result = result.replace(/BANKADDRESSW92/g, titleAddressLine2);
-  }
+  result = result.replace(/TITLEADRSINVOICEONE/g, titleAddressLine1);
+  result = result.replace(/TITLEADRSINVOICETWO/g, titleAddressLine2);
   result = result.replace(/ROUTINGNUMBER/g, bankAccount.routingNumber || "");
   result = result.replace(/ACCTNAME/g, bankAccount.acctName || "");
   result = result.replace(/ACCTNUMBER/g, bankAccount.acctNumber || "");

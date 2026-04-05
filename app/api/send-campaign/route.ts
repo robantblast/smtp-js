@@ -179,7 +179,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
       chunkSize: formData.get("chunkSize") ? Number(formData.get("chunkSize")) : 50,
       interChunkDelayMs: formData.get("interChunkDelayMs")
         ? Number(formData.get("interChunkDelayMs"))
-        : 0
+        : 0,
+      addressLine1: String(formData.get("addressLine1") || "") || undefined,
+      addressLine2: String(formData.get("addressLine2") || "") || undefined
     };
 
     const credentials =

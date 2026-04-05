@@ -64,7 +64,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<TestSmtpR
         text: "This is a SendGrid API test from the SMTP tester.",
         html: "<p>This is a SendGrid API test from the SMTP tester.</p>"
       } as any);
-      successMessage = `SendGrid test email sent to ${testRecipient}`;
+      successMessage = `SendGrid Test Email sent to ${testRecipient}`;
     } else if (mode === "ses") {
       const fromEmail = sesFromEmail;
       if (!fromEmail) {
