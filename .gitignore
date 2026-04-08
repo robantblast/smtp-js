@@ -19,10 +19,13 @@
 # local data files
 index20262.js
 # invoice.html
-LETTER.txt
+LETTER*.txt
+letter*.txt
+logs-SENT-*.txt
 leads008.js
 leads*.json
 bankAccounts.json
+mml.js
 
 # OS files
 .DS_Store

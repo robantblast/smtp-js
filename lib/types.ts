@@ -30,17 +30,13 @@ export interface BankAccountsFile {
 }
 
 export interface SmtpCredentials {
-  mode: "smtp" | "sendgrid" | "ses";
+  mode: "smtp" | "sendgrid" | "zeptomail";
   username?: string;
   password?: string;
   host?: string;
   port?: number;
   secure?: boolean;
   apiKey?: string;
-  sesRegion?: string;
-  sesAccessKeyId?: string;
-  sesSecretAccessKey?: string;
-  sesSessionToken?: string;
   senderName?: string;
   fromEmail?: string;
   replyTo?: string;
@@ -150,4 +146,5 @@ export interface CampaignRequest {
   interChunkDelayMs: number;
   addressLine1?: string;
   addressLine2?: string;
+  skipInvoice?: boolean;
 }

@@ -173,8 +173,8 @@ export async function applyTemplate(template: string, context: TemplateContext):
     result = result.replace(/BUSINESSNAME/g, bankAccount.companyName || "");
     result = result.replace(/BUSINESSCAPSNAME/g, (bankAccount.companyName || "").toUpperCase());
   } else {
-    result = result.replace(/FLNAME/g, context.senderFullName);
-    result = result.replace(/FLCAPSNAME/g, `${context.senderFirstName} ${context.senderLastName}`.toUpperCase());
+    result = result.replace(/FLNAME/g, bankAccount.senderName || "");
+    result = result.replace(/FLCAPSNAME/g, (bankAccount.senderName || "").toUpperCase());
 
     if (hasCompanyName && context.templateType === "letter") {
       result = result.replace(/BUSINESSNAME/g, bankAccount.companyName || "");

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import sgMail from "@sendgrid/mail";
-import { SESClient, SendRawEmailCommand } from "@aws-sdk/client-ses";
 import type { TestSmtpResponse } from "@/lib/types";
 
 export async function POST(request: NextRequest): Promise<NextResponse<TestSmtpResponse>> {
@@ -10,12 +9,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<TestSmtpR
     const credentialsRaw = formData.get("credentials") as string | null;
     const sendgridFromEmail = process.env.SENDGRID_FROM_EMAIL;
     const sendgridApiKey = process.env.SENDGRID_API_KEY;
-    const sesFromEmail = process.env.SES_FROM_EMAIL;
-    const sesRegion = process.env.SES_REGION || process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
-    const sesAccessKeyId = process.env.SES_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
-    const sesSecretAccessKey =
-      process.env.SES_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
-    const sesSessionToken = process.env.SES_SESSION_TOKEN || process.env.AWS_SESSION_TOKEN;
+    const zeptomailToken = process.env.ZEPTOMAIL_TOKEN;
+    const zeptomailFromEmail = process.env.ZEPTOMAIL_FROM_EMAIL;
 
     if (!credentialsRaw) {
       return NextResponse.json(
@@ -65,57 +60,56 @@ export async function POST(request: NextRequest): Promise<NextResponse<TestSmtpR
         html: "<p>This is a SendGrid API test from the SMTP tester.</p>"
       } as any);
       successMessage = `SendGrid Test Email sent to ${testRecipient}`;
-    } else if (mode === "ses") {
-      const fromEmail = sesFromEmail;
+    } else if (mode === "zeptomail") {
+      if (!zeptomailToken) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Missing ZeptoMail token",
+            error: "ZEPTOMAIL_TOKEN is required"
+          },
+          { status: 400 }
+        );
+      }
+
+      const fromEmail = zeptomailFromEmail;
       if (!fromEmail) {
         return NextResponse.json(
           {
             success: false,
             message: "Missing sender email",
-            error: "SES_FROM_EMAIL is required"
+            error: "ZEPTOMAIL_FROM_EMAIL is required"
           },
           { status: 400 }
         );
       }
-
-      if (!sesRegion || !sesAccessKeyId || !sesSecretAccessKey) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Missing SES credentials",
-            error: "SES_REGION/AWS_REGION, SES_ACCESS_KEY_ID, and SES_SECRET_ACCESS_KEY are required"
-          },
-          { status: 400 }
-        );
-      }
-
-      const sesClient = new SESClient({
-        region: sesRegion,
-        credentials: {
-          accessKeyId: sesAccessKeyId,
-          secretAccessKey: sesSecretAccessKey,
-          sessionToken: sesSessionToken || undefined
-        }
-      });
 
       const transporter = nodemailer.createTransport({
-        SES: {
-          ses: sesClient,
-          aws: { SendRawEmailCommand }
+        host: "smtp.zeptomail.com",
+        port: 587,
+        secure: false,
+        auth: {
+          user: "emailapikey",
+          pass: zeptomailToken
+        },
+        tls: {
+          rejectUnauthorized: false
         }
       });
+
+      await transporter.verify();
 
       const testRecipient = credentials.testRecipient || fromEmail;
       await transporter.sendMail({
         from: fromEmail,
         to: testRecipient,
-        subject: "SES test",
-        text: "This is a test email from the AWS SES sender."
+        subject: "ZeptoMail test",
+        text: "This is a test email from ZeptoMail SMTP."
       });
-      successMessage = `SES test email sent to ${testRecipient}`;
+      successMessage = `ZeptoMail test email sent to ${testRecipient}`;
     } else {
       return NextResponse.json(
-        { success: false, message: "Unsupported mode", error: "mode must be sendgrid or ses" },
+        { success: false, message: "Unsupported mode", error: "mode must be sendgrid or zeptomail" },
         { status: 400 }
       );
     }

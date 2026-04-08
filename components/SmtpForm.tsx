@@ -14,13 +14,13 @@ export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
   const [testRecipient, setTestRecipient] = useState("");
 
   const isSendgrid = provider === "SendGrid";
-  const isSes = provider === "Amazon SES";
+  const isZeptomail = provider === "ZeptoMail";
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
 
     const credentials: SmtpCredentials = {
-      mode: isSes ? "ses" : "sendgrid",
+      mode: isZeptomail ? "zeptomail" : "sendgrid",
       testRecipient: testRecipient.trim() || undefined
     };
 
@@ -76,7 +76,7 @@ export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
       <div className="mt-6 flex items-center justify-between">
         <div className="text-xs text-ink-300">
           {isSendgrid && <span>SendGrid API mode (env credentials)</span>}
-          {isSes && <span>SES API mode (env credentials)</span>}
+          {isZeptomail && <span>ZeptoMail SMTP mode (env credentials)</span>}
         </div>
         <button
           type="submit"

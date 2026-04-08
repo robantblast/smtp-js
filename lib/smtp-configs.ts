@@ -9,15 +9,15 @@ export interface SmtpConfig {
 export const SMTP_CONFIGS: SmtpConfig[] = [
   {
     name: "SendGrid",
-    displayName: "SG",
+    displayName: "SendGrid",
     host: "smtp.sendgrid.net",
     port: 587,
     secure: false
   },
   {
-    name: "Amazon SES",
-    displayName: "AWS SES",
-    host: "",
+    name: "ZeptoMail",
+    displayName: "Zepto",
+    host: "smtp.zeptomail.com",
     port: 587,
     secure: false
   }

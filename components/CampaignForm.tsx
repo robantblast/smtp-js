@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 interface CampaignFormProps {
   isLoading: boolean;
-  smtpMode: "smtp" | "sendgrid" | "ses" | null;
+  smtpMode: "smtp" | "sendgrid" | "zeptomail" | null;
   onSend: (payload: FormData) => void;
 }
 
@@ -23,6 +23,7 @@ export default function CampaignForm({
   const [invoicePrefix, setInvoicePrefix] = useState("$");
   const [baseDateTime, setBaseDateTime] = useState("");
   const [skipValidation, setSkipValidation] = useState(false);
+  const [skipInvoice, setSkipInvoice] = useState(false);
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
 
@@ -70,6 +71,10 @@ export default function CampaignForm({
 
     if (skipValidation) {
       payload.append("skipValidation", "1");
+    }
+
+    if (skipInvoice) {
+      payload.append("skipInvoice", "1");
     }
 
     if (addressLine1.trim()) {
@@ -228,6 +233,21 @@ export default function CampaignForm({
         </label>
         <span className="text-xs text-ink-300">
           Skipping validation uploads faster but bad leads will fail during send.
+        </span>
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <label className="flex items-center gap-3 text-sm text-ink-200">
+          <input
+            type="checkbox"
+            checked={skipInvoice}
+            onChange={(event) => setSkipInvoice(event.target.checked)}
+            className="h-4 w-4"
+          />
+          Don't attach invoice
+        </label>
+        <span className="text-xs text-ink-300">
+          Send emails without the PDF invoice attachment.
         </span>
       </div>
 

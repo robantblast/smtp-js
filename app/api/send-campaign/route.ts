@@ -22,39 +22,27 @@ const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 const SENDGRID_FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL;
 const SENDGRID_REPLY_TO = process.env.SENDGRID_REPLY_TO;
 const SENDGRID_SENDER_NAME = process.env.SENDGRID_SENDER_NAME;
-const SES_REGION = process.env.SES_REGION || process.env.AWS_REGION;
-const SES_ACCESS_KEY_ID = process.env.SES_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
-const SES_SECRET_ACCESS_KEY =
-  process.env.SES_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
-const SES_SESSION_TOKEN = process.env.SES_SESSION_TOKEN || process.env.AWS_SESSION_TOKEN;
-const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL;
-const SES_REPLY_TO = process.env.SES_REPLY_TO;
-const SES_SENDER_NAME = process.env.SES_SENDER_NAME;
+const ZEPTOMAIL_TOKEN = process.env.ZEPTOMAIL_TOKEN;
+const ZEPTOMAIL_FROM_EMAIL = process.env.ZEPTOMAIL_FROM_EMAIL;
 
-function getSesCredentials(): SmtpCredentials {
-  const sesRegion = SES_REGION;
-  const accessKeyId = SES_ACCESS_KEY_ID;
-  const secretAccessKey = SES_SECRET_ACCESS_KEY;
-  const fromEmail = SES_FROM_EMAIL;
+function getZeptomailCredentials(): SmtpCredentials {
+  if (!ZEPTOMAIL_TOKEN) {
+    throw new Error("Missing ZeptoMail config: ZEPTOMAIL_TOKEN is required");
+  }
 
-  if (!sesRegion || !accessKeyId || !secretAccessKey || !fromEmail) {
-    const missing: string[] = [];
-    if (!sesRegion) missing.push("SES_REGION/AWS_REGION");
-    if (!accessKeyId) missing.push("SES_ACCESS_KEY_ID/AWS_ACCESS_KEY_ID");
-    if (!secretAccessKey) missing.push("SES_SECRET_ACCESS_KEY/AWS_SECRET_ACCESS_KEY");
-    if (!fromEmail) missing.push("SES_FROM_EMAIL");
-    throw new Error(`Missing SES config: ${missing.join(", ")}`);
+  const fromEmail = ZEPTOMAIL_FROM_EMAIL;
+  if (!fromEmail) {
+    throw new Error("Missing ZeptoMail config: ZEPTOMAIL_FROM_EMAIL is required");
   }
 
   return {
-    mode: "ses",
-    sesRegion,
-    sesAccessKeyId: accessKeyId,
-    sesSecretAccessKey: secretAccessKey,
-    sesSessionToken: SES_SESSION_TOKEN,
-    fromEmail,
-    replyTo: SES_REPLY_TO || undefined,
-    senderName: SES_SENDER_NAME || undefined
+    mode: "zeptomail",
+    host: "smtp.zeptomail.com",
+    port: 587,
+    secure: false,
+    username: "emailapikey",
+    password: ZEPTOMAIL_TOKEN,
+    fromEmail
   };
 }
 
@@ -81,7 +69,7 @@ function resolveSmtpMode(value: string | null): SmtpCredentials["mode"] | null {
   if (!value) return null;
   const normalized = value.trim().toLowerCase();
   if (normalized === "sendgrid") return "sendgrid";
-  if (normalized === "ses") return "ses";
+  if (normalized === "zeptomail") return "zeptomail";
   return null;
 }
 
@@ -131,7 +119,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
         {
           success: false,
           message: "Missing SMTP provider",
-          error: "smtpMode must be sendgrid or ses"
+          error: "smtpMode must be sendgrid or zeptomail"
         },
         { status: 400 }
       );
@@ -181,11 +169,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
         ? Number(formData.get("interChunkDelayMs"))
         : 0,
       addressLine1: String(formData.get("addressLine1") || "") || undefined,
-      addressLine2: String(formData.get("addressLine2") || "") || undefined
+      addressLine2: String(formData.get("addressLine2") || "") || undefined,
+      skipInvoice: String(formData.get("skipInvoice") || "") === "1"
     };
 
     const credentials =
-      smtpMode === "ses" ? getSesCredentials() : getSendgridCredentials(senderEmail);
+      smtpMode === "zeptomail" ? getZeptomailCredentials() : getSendgridCredentials(senderEmail);
 
     // Run the campaign directly (no SQS queue)
     const summary = await sendCampaign({

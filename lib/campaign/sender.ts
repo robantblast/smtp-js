@@ -1,6 +1,5 @@
 import nodemailer from "nodemailer";
 import sgMail from "@sendgrid/mail";
-import { SESClient, SendRawEmailCommand } from "@aws-sdk/client-ses";
 import { promises as fs } from "fs";
 import type { BankAccount, BankAccountsFile, CampaignRequest, Lead, SmtpCredentials } from "@/lib/types";
 import { applySubjectTemplate, applyTemplate, buildCatchAllReplyTo, splitNameAndFormatEmail } from "./placeholders";
@@ -103,26 +102,21 @@ export async function sendCampaign(payload: CampaignPayload) {
       throw new Error("SendGrid API key is required");
     }
     sgMail.setApiKey(credentials.apiKey);
-  } else if (mode === "ses") {
-    if (!credentials.sesRegion || !credentials.sesAccessKeyId || !credentials.sesSecretAccessKey) {
-      throw new Error("SES region and access keys are required");
-    }
-
-    const sesClient = new SESClient({
-      region: credentials.sesRegion,
-      credentials: {
-        accessKeyId: credentials.sesAccessKeyId,
-        secretAccessKey: credentials.sesSecretAccessKey,
-        sessionToken: credentials.sesSessionToken || undefined
-      }
-    });
-
+  } else if (mode === "zeptomail") {
     transporter = nodemailer.createTransport({
-      SES: {
-        ses: sesClient,
-        aws: { SendRawEmailCommand }
+      host: credentials.host || "smtp.zeptomail.com",
+      port: credentials.port || 587,
+      secure: credentials.secure ?? false,
+      auth: {
+        user: credentials.username || "emailapikey",
+        pass: credentials.password
+      },
+      tls: {
+        rejectUnauthorized: false
       }
     });
+
+    await transporter.verify();
   } else {
     transporter = nodemailer.createTransport({
       host: credentials.host,
@@ -196,32 +190,37 @@ export async function sendCampaign(payload: CampaignPayload) {
           US_EASTERN_TIMEZONE
         );
 
-        const invoiceHtml = await applyTemplate(invoiceTemplate, {
-          lead,
-          bankAccount,
-          invoiceCode,
-          invoiceAmount,
-          replyToEmail: dynamicReplyTo,
-          senderFullName,
-          senderFirstName: firstName,
-          senderLastName: lastName,
-          formattedEmail,
-          formattedEmail1,
-          formattedEmail2,
-          templateType: "invoice",
-          timezone: request.attachmentTimezone || "UTC",
-          addressLine1: request.addressLine1,
-          addressLine2: request.addressLine2
-        });
+        let pdfBuffer: Buffer | null = null;
+        let filename = "";
 
-        const invoiceWithDates = applyLegacyDateReplacements(
-          invoiceHtml,
-          baseDate,
-          US_EASTERN_TIMEZONE
-        );
+        if (!request.skipInvoice) {
+          const invoiceHtml = await applyTemplate(invoiceTemplate, {
+            lead,
+            bankAccount,
+            invoiceCode,
+            invoiceAmount,
+            replyToEmail: dynamicReplyTo,
+            senderFullName,
+            senderFirstName: firstName,
+            senderLastName: lastName,
+            formattedEmail,
+            formattedEmail1,
+            formattedEmail2,
+            templateType: "invoice",
+            timezone: request.attachmentTimezone || "UTC",
+            addressLine1: request.addressLine1,
+            addressLine2: request.addressLine2
+          });
 
-        const pdfBuffer = await generatePdfFromHtml(invoiceWithDates);
-        const filename = await readFilename(request.invoiceFilename, lead, invoiceCode);
+          const invoiceWithDates = applyLegacyDateReplacements(
+            invoiceHtml,
+            baseDate,
+            US_EASTERN_TIMEZONE
+          );
+
+          pdfBuffer = await generatePdfFromHtml(invoiceWithDates);
+          filename = await readFilename(request.invoiceFilename, lead, invoiceCode);
+        }
 
         const baseSenderEmail = request.senderEmail || credentials.fromEmail || credentials.username || "";
         const senderDomain = baseSenderEmail.split("@")[1] || "";
@@ -240,6 +239,8 @@ export async function sendCampaign(payload: CampaignPayload) {
           throw new Error("Sender email is required to send mail");
         }
 
+        console.log(`[SENDING] To: ${lead.email} | From: ${senderEmail}`);
+
         try {
           if (mode === "sendgrid") {
             const sgConfig: Record<string, unknown> = {
@@ -251,14 +252,14 @@ export async function sendCampaign(payload: CampaignPayload) {
               subject,
               text: letterWithDates,
               html: isHtml ? letterWithDates : undefined,
-              attachments: [
+              attachments: pdfBuffer ? [
                 {
                   filename,
                   content: pdfBuffer.toString("base64"),
                   type: "application/pdf",
                   disposition: "attachment"
                 }
-              ]
+              ] : []
             };
 
             if (replyToAddress) {
@@ -270,20 +271,23 @@ export async function sendCampaign(payload: CampaignPayload) {
 
             await sgMail.send(sgConfig as any);
           } else if (transporter) {
+            const fromField = mode === "zeptomail" 
+              ? `${senderFullName} <${senderEmail}>` 
+              : senderFullName;
             const mailConfig = {
-              from: senderFullName,
+              from: fromField,
               to: lead.email,
               replyTo: replyToAddress ? `${senderFullName} <${replyToAddress}>` : "robanthony850@gmail.com",
               subject,
               text: letterWithDates,
               html: isHtml ? letterWithDates : undefined,
-              attachments: [
+              attachments: pdfBuffer ? [
                 {
                   filename,
                   content: pdfBuffer,
                   contentType: "application/pdf"
                 }
-              ]
+              ] : []
             };
 
             await transporter.sendMail(mailConfig);
