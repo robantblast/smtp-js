@@ -170,7 +170,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendCampa
         : 0,
       addressLine1: String(formData.get("addressLine1") || "") || undefined,
       addressLine2: String(formData.get("addressLine2") || "") || undefined,
-      skipInvoice: String(formData.get("skipInvoice") || "") === "1"
+      skipInvoice: String(formData.get("skipInvoice") || "") === "1",
+      customSubject: String(formData.get("customSubject") || "") || undefined
     };
 
     const credentials =

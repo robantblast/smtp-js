@@ -152,7 +152,9 @@ export async function sendCampaign(payload: CampaignPayload) {
         const bankAccount = getBankAccount(bankAccounts.accounts, accountIndex);
 
         const randomInitial = randomString(1, "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-        const senderFullName = lead.name;
+        const leadNameOrFallback = lead.name?.trim() || "";
+        const senderFullName = leadNameOrFallback || 
+          (lead.email.split("@")[0] || "").replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
         const invoiceCode = generateInvoiceCode();
         const prefixSource = request.invoicePrefix || bankAccount.invoicePrefix || "$39,994.05";
         const invoiceAmount = generateInvoiceAmount(prefixSource);
@@ -161,7 +163,9 @@ export async function sendCampaign(payload: CampaignPayload) {
           splitNameAndFormatEmail(senderFullName, bankAccount.domain || "");
 
         const dynamicReplyTo = buildCatchAllReplyTo(lead.name, lead.email, bankAccount.replyToEmail || "");
-        const subjectBase = applySubjectTemplate(bankAccount.emailSubject || "FJUWORDZ", lead, invoiceCode);
+        const subjectBase = request.customSubject
+          ? applySubjectTemplate(request.customSubject, lead, invoiceCode)
+          : applySubjectTemplate(bankAccount.emailSubject || "FJUWORDZ", lead, invoiceCode);
         const subject = `${request.subjectPrefix || ""}${subjectBase}`;
         const bodySubject = `${request.bodySubjectPrefix || ""}${subjectBase}`;
 

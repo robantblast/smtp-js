@@ -9,7 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@aws-sdk/client-ses": "^3.1022.0",
     "@sendgrid/mail": "^8.1.6",
     "next": "14.0.4",
     "nodemailer": "^6.9.7",

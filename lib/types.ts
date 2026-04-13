@@ -41,6 +41,7 @@ export interface SmtpCredentials {
   fromEmail?: string;
   replyTo?: string;
   testRecipient?: string;
+  skipTestEmail?: boolean;
 }
 
 export interface TestSmtpResponse {
@@ -67,7 +68,6 @@ export interface SendCampaignResponse {
 }
 
 export interface CampaignQueueMessage {
-  payloadMode?: "inline" | "s3";
   leads?: {
     filename: string;
     content: string;
@@ -78,14 +78,6 @@ export interface CampaignQueueMessage {
   };
   letterTemplate?: string;
   invoiceTemplate?: string;
-  storage?: {
-    bucket: string;
-    prefix: string;
-    leadsKey: string;
-    bankAccountsKey: string;
-    letterKey: string;
-    invoiceKey: string;
-  };
   credentials: SmtpCredentials;
   request: CampaignRequest;
 }
@@ -147,4 +139,5 @@ export interface CampaignRequest {
   addressLine1?: string;
   addressLine2?: string;
   skipInvoice?: boolean;
+  customSubject?: string;
 }

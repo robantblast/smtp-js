@@ -12,6 +12,7 @@ interface SmtpFormProps {
 export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
   const [provider, setProvider] = useState("SendGrid");
   const [testRecipient, setTestRecipient] = useState("");
+  const [skipTestEmail, setSkipTestEmail] = useState(false);
 
   const isSendgrid = provider === "SendGrid";
   const isZeptomail = provider === "ZeptoMail";
@@ -21,7 +22,8 @@ export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
 
     const credentials: SmtpCredentials = {
       mode: isZeptomail ? "zeptomail" : "sendgrid",
-      testRecipient: testRecipient.trim() || undefined
+      testRecipient: testRecipient.trim() || undefined,
+      skipTestEmail
     };
 
     onTest(credentials);
@@ -64,12 +66,23 @@ export default function SmtpForm({ onTest, isLoading }: SmtpFormProps) {
             type="email"
             value={testRecipient}
             onChange={(event) => setTestRecipient(event.target.value)}
-            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
+            disabled={skipTestEmail}
+            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
             placeholder="yourtestemail@gmail.com"
           />
           <span className="text-xs text-ink-400">
             The test sends an email to the recipient above.
           </span>
+        </label>
+
+        <label className="flex items-center gap-3 text-sm md:col-span-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={skipTestEmail}
+            onChange={(event) => setSkipTestEmail(event.target.checked)}
+            className="h-4 w-4 rounded border-ink-600 bg-ink-800 text-clay-500 focus:ring-clay-500/20"
+          />
+          <span className="text-ink-200">Skip test email (verify connection only)</span>
         </label>
       </div>
 

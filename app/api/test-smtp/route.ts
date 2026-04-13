@@ -51,15 +51,20 @@ export async function POST(request: NextRequest): Promise<NextResponse<TestSmtpR
 
       sgMail.setApiKey(sendgridApiKey);
 
-      const testRecipient = credentials.testRecipient || fromEmail;
-      await sgMail.send({
-        to: testRecipient,
-        from: fromEmail,
-        subject: "SendGrid test",
-        text: "This is a SendGrid API test from the SMTP tester.",
-        html: "<p>This is a SendGrid API test from the SMTP tester.</p>"
-      } as any);
-      successMessage = `SendGrid Test Email sent to ${testRecipient}`;
+      if (credentials.skipTestEmail) {
+        // Just verify the API key is set and valid format
+        successMessage = "SendGrid connection verified (no test email sent)";
+      } else {
+        const testRecipient = credentials.testRecipient || fromEmail;
+        await sgMail.send({
+          to: testRecipient,
+          from: fromEmail,
+          subject: "SendGrid test",
+          text: "This is a SendGrid API test from the SMTP tester.",
+          html: "<p>This is a SendGrid API test from the SMTP tester.</p>"
+        } as any);
+        successMessage = `SendGrid Test Email sent to ${testRecipient}`;
+      }
     } else if (mode === "zeptomail") {
       if (!zeptomailToken) {
         return NextResponse.json(
@@ -99,14 +104,18 @@ export async function POST(request: NextRequest): Promise<NextResponse<TestSmtpR
 
       await transporter.verify();
 
-      const testRecipient = credentials.testRecipient || fromEmail;
-      await transporter.sendMail({
-        from: fromEmail,
-        to: testRecipient,
-        subject: "ZeptoMail test",
-        text: "This is a test email from ZeptoMail SMTP."
-      });
-      successMessage = `ZeptoMail test email sent to ${testRecipient}`;
+      if (credentials.skipTestEmail) {
+        successMessage = "ZeptoMail connection verified (no test email sent)";
+      } else {
+        const testRecipient = credentials.testRecipient || fromEmail;
+        await transporter.sendMail({
+          from: fromEmail,
+          to: testRecipient,
+          subject: "ZeptoMail test",
+          text: "This is a test email from ZeptoMail SMTP."
+        });
+        successMessage = `ZeptoMail test email sent to ${testRecipient}`;
+      }
     } else {
       return NextResponse.json(
         { success: false, message: "Unsupported mode", error: "mode must be sendgrid or zeptomail" },

@@ -24,6 +24,7 @@ export default function CampaignForm({
   const [baseDateTime, setBaseDateTime] = useState("");
   const [skipValidation, setSkipValidation] = useState(false);
   const [skipInvoice, setSkipInvoice] = useState(false);
+  const [customSubject, setCustomSubject] = useState("");
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
 
@@ -75,6 +76,10 @@ export default function CampaignForm({
 
     if (skipInvoice) {
       payload.append("skipInvoice", "1");
+    }
+
+    if (customSubject.trim()) {
+      payload.append("customSubject", customSubject.trim());
     }
 
     if (addressLine1.trim()) {
@@ -174,6 +179,27 @@ export default function CampaignForm({
           />
         </label>
 
+        <label className="flex flex-col gap-2 text-sm">
+          <span className="text-ink-200">
+            Custom subject
+            <span
+              className="ml-2 cursor-help text-ink-400"
+              title="Overrides the subject line. Supports placeholders like FNAME, INVOICECODE, etc."
+            >
+              (?)
+            </span>
+          </span>
+          <input
+            type="text"
+            value={customSubject}
+            onChange={(event) => setCustomSubject(event.target.value)}
+            className="rounded-xl border border-ink-600 bg-ink-800/70 px-3 py-2 text-ink-100 placeholder:text-ink-400 focus:border-clay-400 focus:outline-none focus:ring-2 focus:ring-clay-500/20"
+            placeholder="Invoice #INVOICECODE for FNAME"
+          />
+        </label>
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm">
           <span className="text-ink-200">Emails per account</span>
           <input
